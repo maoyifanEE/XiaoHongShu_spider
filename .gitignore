@@ -1,0 +1,17 @@
+.venv/
+.ms-playwright/
+browser_profile/
+logs/
+data/xhs_data.sqlite3
+data/xhs_data.sqlite3-*
+data/checkpoints/
+data/backups/
+data/raw/
+output/
+screenshots/errors/
+*.cookie
+*.token
+__pycache__/
+.pytest_cache/
+*.pyc
+*.egg-info/

@@ -1,0 +1,35 @@
+program:
+  version: "0.1.0"
+  timezone: "Asia/Shanghai"
+
+creators:
+  - name: "辣香郭"
+    xhs_id: "Guo505050"
+    user_id: "5cfb1f8e00000000100322e4"
+    url: "https://www.xiaohongshu.com/user/profile/5cfb1f8e00000000100322e4"
+    enabled: true
+
+browser:
+  persistent_profile: true
+  headed: true
+  slow_mo_ms: 80
+  login_timeout_minutes: 30
+  navigation_timeout_ms: 60000
+
+safety:
+  concurrency: 1
+  min_delay_seconds: 6
+  max_delay_seconds: 14
+  max_notes_per_run: null
+  max_page_visits_per_run: null
+  max_runtime_minutes: null
+  max_consecutive_errors: 3
+  scroll_idle_rounds: 5
+  scroll_max_rounds: 300
+
+collection:
+  collect_top_comments: 3
+  download_media: false
+  smoke_note_limit: 3
+  smoke_max_attempts: 12
+  online_qa_sample_size: 5

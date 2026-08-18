@@ -1,0 +1,5 @@
+playwright==1.46.0
+PyYAML==6.0.2
+openpyxl==3.1.5
+pytest==8.3.2
+tzdata==2026.1

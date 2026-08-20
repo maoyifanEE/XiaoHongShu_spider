@@ -2,6 +2,7 @@ import asyncio
 from pathlib import Path
 
 import pytest
+from playwright.async_api import async_playwright
 
 import xhs_profile_exporter.crawler as crawler_module
 from xhs_profile_exporter.config import AppConfig, CreatorConfig
@@ -431,6 +432,130 @@ def test_run_result_and_db_include_collect_safe_stop_reason(tmp_path: Path, monk
     assert result["safe_stop_reason"] == "MAX_CONSECUTIVE_ERRORS"
     assert db.finished["safe_stop_reason"] == "MAX_CONSECUTIVE_ERRORS"
     assert db.finished["notes"]["safe_stop_reason"] == "MAX_CONSECUTIVE_ERRORS"
+
+
+def test_collect_safe_stop_returns_partial_stats(tmp_path: Path, monkeypatch):
+    db = DummyDb()
+    crawler = Crawler(app_config(tmp_path), db, DummyLogger())
+    page = FakePage()
+    creator = app_config(tmp_path).creators[0]
+    cards = [{"note_id": "66dabcde000000001f01abcd"}, {"note_id": "aaaaaaaaaaaaaaaaaaaaaaaa"}]
+
+    async def fake_open(page, profile_url, card, budget):
+        return OpenNoteResult(page=page, note_id=card["note_id"], strategy="test", target_verified=True)
+
+    async def fake_extract(page, note_id, top_n):
+        return {"note_id": note_id, "status": "OK", "title": "ok", "top_comments": [], "raw_json": {}}
+
+    calls = 0
+
+    async def fake_return(*args, **kwargs):
+        nonlocal calls
+        calls += 1
+        if calls == 1:
+            raise SafeStopRequested(LoginStatus.RISK_CONTROL_DETECTED, "RISK_CONTROL_DETECTED", "profile_return_after_back", cards[0]["note_id"])
+        return {"strategy": "ok", "profile_restored": True, "route_after": "/user/profile/x"}
+
+    monkeypatch.setattr(crawler, "_open_note_from_profile", fake_open)
+    monkeypatch.setattr(crawler, "_extract_initial_state_note_record", lambda *args, **kwargs: _return_async(None))
+    monkeypatch.setattr(crawler_module, "extract_note_dom", fake_extract)
+    monkeypatch.setattr(crawler, "_return_to_creator_profile", fake_return)
+    monkeypatch.setattr(crawler_module, "browser_flush_if_available", lambda *args, **kwargs: _noop_async())
+    result = asyncio.run(crawler._collect_notes(page, creator, cards, _checkpoint(tmp_path), crawler._build_budget()))
+    assert result.safe_stop_reason == "RISK_CONTROL_DETECTED"
+    assert result.safe_stop_status == LoginStatus.RISK_CONTROL_DETECTED
+    assert result.exportable_ids == [cards[0]["note_id"]]
+    assert result.attempted_ids == [cards[0]["note_id"]]
+
+
+def test_extract_initial_state_note_record_uses_exact_note_detail_map(tmp_path: Path):
+    async def run():
+        note_id = "66dabcde000000001f01abcd"
+        crawler = Crawler(app_config(tmp_path), DummyDb(), DummyLogger())
+        async with async_playwright() as p:
+            browser = await p.chromium.launch(headless=True)
+            page = await browser.new_page()
+            await page.set_content("<html></html>")
+            await page.evaluate(
+                """
+                ([noteId]) => {
+                  window.__INITIAL_STATE__ = {
+                    note: {
+                      noteDetailMap: {
+                        [noteId]: {
+                          note: {
+                            id: noteId,
+                            title: "T",
+                            desc: "B",
+                            type: "normal",
+                            time: 1234567890000,
+                            interactInfo: {likedCount: "123", collectedCount: "45", commentCount: "6", shareCount: "7"},
+                            tagList: [{name: "杭州"}, {name: "旅行"}],
+                            privatePayload: {x: 1}
+                          }
+                        }
+                      }
+                    }
+                  };
+                }
+                """,
+                [note_id],
+            )
+            record = await crawler._extract_initial_state_note_record(page, note_id)
+            await browser.close()
+            return record
+
+    record = asyncio.run(run())
+    assert record["liked_count"] == "123"
+    assert record["collected_count"] == "45"
+    assert record["comment_count"] == "6"
+    assert record["share_count"] == "7"
+    assert record["tags"] == ["旅行", "杭州"]
+    assert "privatePayload" not in str(record)
+
+
+def test_extract_initial_state_profile_record_uses_user_page_data(tmp_path: Path):
+    async def run():
+        creator_id = "5cfb1f8e00000000100322e4"
+        crawler = Crawler(app_config(tmp_path), DummyDb(), DummyLogger())
+        async with async_playwright() as p:
+            browser = await p.chromium.launch(headless=True)
+            page = await browser.new_page()
+            await page.set_content("<html></html>")
+            await page.evaluate(
+                """
+                ([creatorId]) => {
+                  window.__INITIAL_STATE__ = {
+                    user: {
+                      userPageData: {
+                        userId: creatorId,
+                        nickname: "昵称",
+                        desc: "公开简介",
+                        gender: 1,
+                        ipLocation: "浙江",
+                        follows: "123",
+                        fans: "1.2万",
+                        interaction: "8.5万",
+                        tags: [{name: "健康"}],
+                        privatePayload: {x: 1}
+                      }
+                    }
+                  };
+                }
+                """,
+                [creator_id],
+            )
+            record = await crawler._extract_initial_state_profile_record(page, creator_id)
+            await browser.close()
+            return record
+
+    record = asyncio.run(run())
+    assert record["user_id"] == "5cfb1f8e00000000100322e4"
+    assert record["following"] == "123"
+    assert record["followers"] == "1.2万"
+    assert record["interactions"] == "8.5万"
+    assert record["tags"] == ["健康"]
+    assert "privatePayload" not in str(record)
 
 
 def test_navigation_failure_counter_resets_after_success(tmp_path: Path, monkeypatch):

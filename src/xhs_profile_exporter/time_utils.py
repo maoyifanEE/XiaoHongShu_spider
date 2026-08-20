@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime, timedelta
+from typing import Any
 from zoneinfo import ZoneInfo
 
 
@@ -37,3 +38,22 @@ def normalize_relative_time(raw: str | None, captured_at: datetime | None = None
         return None, raw
     return text, raw
 
+
+def normalize_publish_time_value(raw: Any, captured_at: datetime | None = None) -> tuple[str | None, str | None]:
+    if raw is None:
+        return None, None
+    raw_text = str(raw).strip()
+    if not raw_text:
+        return None, raw_text
+    if raw_text.isdigit():
+        try:
+            timestamp = int(raw_text)
+        except ValueError:
+            return None, raw_text
+        digit_len = len(raw_text)
+        if digit_len == 10:
+            return datetime.fromtimestamp(timestamp, TZ).isoformat(timespec="seconds"), raw_text
+        if digit_len == 13:
+            return datetime.fromtimestamp(timestamp / 1000, TZ).isoformat(timespec="seconds"), raw_text
+        return None, raw_text
+    return normalize_relative_time(raw_text, captured_at=captured_at)

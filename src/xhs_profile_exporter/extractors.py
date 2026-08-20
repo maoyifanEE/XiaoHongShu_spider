@@ -4,7 +4,7 @@ import json
 import re
 from typing import Any
 
-from .time_utils import now_iso, normalize_relative_time
+from .time_utils import now_iso, normalize_publish_time_value, normalize_relative_time
 from .utils import canonical_note_url, canonical_profile_url, parse_count, sanitize_url
 
 NOTE_ID_RE = re.compile(r"(?:explore|discovery/item)/([0-9a-fA-F]{24})")
@@ -28,6 +28,10 @@ def extract_note_id(url_or_text: str) -> str | None:
 
 def note_type_from_text(text: str) -> str | None:
     lowered = text.lower()
+    if text in {"normal", "image", "images"}:
+        return "图文"
+    if text in {"video"}:
+        return "视频"
     if "视频" in text or "video" in lowered:
         return "视频"
     if "图文" in text or "图片" in text or "image" in lowered:
@@ -156,6 +160,21 @@ async def extract_note_dom(page: Any, note_id: str, top_n: int = 3) -> dict[str,
           const q = (selectors) => selectors.map((sel) => root.querySelector(sel)).find(Boolean);
           const titleEl = q(["#detail-title", "h1", "[class*=title]", "[data-testid*=title]"]);
           const descEl = q(["#detail-desc", "[class*=desc]", "[class*=content]", ".note-content", "[data-testid*=content]"]);
+          const clean = (el) => el ? (el.innerText || el.textContent || "").trim() : "";
+          const metricText = (selectors) => {
+            const el = q(selectors);
+            const count = el ? el.querySelector(".count, [class*=count], [class*=Count]") : null;
+            return clean(count || el);
+          };
+          const domMetrics = {
+            likes: metricText([".engage-bar .like-wrapper", ".engage-bar [class*=like-wrapper]", ".engage-bar [class*=likeWrapper]", ".engage-bar [class*=Like]"]),
+            collects: metricText([".engage-bar .collect-wrapper", ".engage-bar [class*=collect-wrapper]", ".engage-bar [class*=collectWrapper]", ".engage-bar [class*=Collect]"]),
+            comments: metricText([".engage-bar .chat-wrapper", ".engage-bar [class*=chat-wrapper]", ".engage-bar [class*=comment-wrapper]", ".engage-bar [class*=Chat]", ".engage-bar [class*=Comment]"]),
+            shares: metricText([".engage-bar .share-wrapper", ".engage-bar [class*=share-wrapper]", ".engage-bar [class*=shareWrapper]", ".engage-bar [class*=Share]"])
+          };
+          const tagNames = Array.from(root.querySelectorAll('#detail-desc a[href*="search"], #detail-desc a[href*="search_result"], a[href*="/search_result"], a[href*="/search"]'))
+            .map((el) => clean(el).replace(/^#/, ""))
+            .filter(Boolean);
           const commentEls = Array.from(root.querySelectorAll('[class*=comment-item], [class*=commentItem], [data-testid*=comment]')).slice(0, 20);
           const comments = commentEls.map((el) => {
              const childComment = el.parentElement && el.parentElement.closest('[class*=comment-item], [class*=commentItem], [data-testid*=comment]') !== el;
@@ -172,6 +191,8 @@ async def extract_note_dom(page: Any, note_id: str, top_n: int = 3) -> dict[str,
             text: root.innerText || "",
             title: titleEl ? titleEl.innerText : "",
             desc: descEl ? descEl.innerText : "",
+            domMetrics,
+            tagNames,
             meta,
             comments,
             url: location.href
@@ -186,10 +207,10 @@ async def extract_note_dom(page: Any, note_id: str, top_n: int = 3) -> dict[str,
     unavailable_status = _detect_unavailable_status(text)
     title = _clean_line(data.get("title")) or _meta_title(data.get("meta", {}))
     body = _extract_body(data.get("desc") or text, title)
-    hashtags = _extract_tags(body or text)
+    hashtags = merge_tags(data.get("tagNames") or [], _extract_tags(body or text))
     publish_raw = _extract_publish_time(text)
     publish_time, publish_time_raw = normalize_relative_time(publish_raw)
-    metrics = _extract_note_metrics(text)
+    metrics = _extract_note_metrics(data.get("domMetrics") or {})
     comments = _extract_comments(data.get("comments") or [], top_n)
     return {
         "note_id": note_id,
@@ -220,7 +241,7 @@ async def extract_note_dom(page: Any, note_id: str, top_n: int = 3) -> dict[str,
                 "share_count": metrics.get("shares_value"),
                 "tags": hashtags,
             },
-            "DOM",
+            "DOM_EXACT",
         ),
         **metrics,
     }
@@ -229,6 +250,7 @@ async def extract_note_dom(page: Any, note_id: str, top_n: int = 3) -> dict[str,
 def merge_note_with_structured(note: dict[str, Any], structured: dict[str, Any] | None) -> dict[str, Any]:
     if not structured:
         return note
+    structured = normalize_public_note_record(structured, note["note_id"]) or structured
     field_sources = dict(note.get("field_sources") or {})
     candidates = _find_dicts_with_note_id(structured, note["note_id"])
     for item in candidates:
@@ -250,16 +272,34 @@ def merge_note_with_structured(note: dict[str, Any], structured: dict[str, Any] 
             ("comment_count", "comments"),
             ("share_count", "shares"),
         ]:
-            if item.get(key) is not None and note.get(f"{out}_value") is None:
-                value, raw, exact = parse_count(item.get(key))
-                note[f"{out}_value"] = value
-                note[f"{out}_raw"] = raw
-                note[f"{out}_is_exact"] = exact
+            if item.get(key) is None:
+                continue
+            state_value, state_raw, state_exact = parse_count(item.get(key))
+            current_value = note.get(f"{out}_value")
+            current_exact = note.get(f"{out}_is_exact")
+            if current_value is None:
+                note[f"{out}_value"] = state_value
+                note[f"{out}_raw"] = state_raw
+                note[f"{out}_is_exact"] = state_exact
                 field_sources[_metric_field_name(out)] = "INITIAL_STATE"
-        if item.get("time") and not note.get("publish_time"):
-            note["publish_time"] = str(item.get("time"))
-            note["publish_time_raw"] = str(item.get("time"))
+            elif state_value is not None and current_value != state_value:
+                note.setdefault("raw_json", {}).setdefault("metric_source_mismatch", []).append(
+                    {"field": _metric_field_name(out), "dom_value": current_value, "state_value": state_value}
+                )
+                if state_exact is True and current_exact is not True:
+                    note[f"{out}_value"] = state_value
+                    note[f"{out}_is_exact"] = True
+                    field_sources[_metric_field_name(out)] = "INITIAL_STATE"
+        publish_value = item.get("publish_time") or item.get("time")
+        if publish_value is not None and not note.get("publish_time"):
+            note["publish_time"], note["publish_time_raw"] = normalize_publish_time_value(publish_value)
             field_sources["publish_time"] = "INITIAL_STATE"
+        if item.get("tags"):
+            before_tags = note.get("hashtags") or []
+            merged_tags = merge_tags(note.get("hashtags") or [], item.get("tags") or [])
+            if merged_tags != before_tags:
+                note["hashtags"] = merged_tags
+                field_sources["tags"] = "INITIAL_STATE" if not before_tags else "DOM_EXACT+INITIAL_STATE"
         break
     note["field_sources"] = _normalize_note_field_sources(note, field_sources)
     return note
@@ -287,10 +327,78 @@ def _structured_note_type(item: dict[str, Any]) -> str | None:
     return None
 
 
-def _extract_note_metrics(text: str) -> dict[str, Any]:
+def normalize_public_note_record(value: dict[str, Any], note_id: str) -> dict[str, Any] | None:
+    candidate_id = value.get("note_id") or value.get("id") or value.get("noteId")
+    if candidate_id and candidate_id != note_id:
+        return None
+    record: dict[str, Any] = {"note_id": note_id}
+    for source_key, out_key in [
+        ("id", "id"),
+        ("note_id", "note_id"),
+        ("noteId", "note_id"),
+        ("title", "title"),
+        ("display_title", "display_title"),
+        ("displayTitle", "display_title"),
+        ("desc", "desc"),
+        ("content", "content"),
+        ("type", "type"),
+        ("note_type", "note_type"),
+        ("noteType", "note_type"),
+        ("model_type", "model_type"),
+        ("modelType", "model_type"),
+        ("time", "time"),
+        ("publish_time", "publish_time"),
+        ("publishTime", "publish_time"),
+    ]:
+        if source_key in value and not isinstance(value.get(source_key), (dict, list)):
+            record[out_key] = value.get(source_key)
+    interact = value.get("interactInfo") if isinstance(value.get("interactInfo"), dict) else {}
+    for out_key, aliases in {
+        "liked_count": ["liked_count", "likedCount"],
+        "collected_count": ["collected_count", "collectedCount"],
+        "comment_count": ["comment_count", "commentCount"],
+        "share_count": ["share_count", "shareCount"],
+    }.items():
+        for alias in aliases:
+            if alias in value and not isinstance(value.get(alias), (dict, list)):
+                record[out_key] = value.get(alias)
+                break
+            if alias in interact and not isinstance(interact.get(alias), (dict, list)):
+                record[out_key] = interact.get(alias)
+                break
+    record["tags"] = normalize_tag_names(value.get("tagList") or value.get("tags"))
+    return {key: item for key, item in record.items() if item not in (None, "", [])}
+
+
+def normalize_tag_names(value: Any) -> list[str]:
+    tags: list[str] = []
+    if isinstance(value, list):
+        for item in value:
+            if isinstance(item, dict):
+                name = item.get("name") or item.get("tagName") or item.get("title")
+            else:
+                name = item
+            if name:
+                tags.append(str(name).strip().lstrip("#"))
+    elif isinstance(value, str):
+        tags.extend(part.strip().lstrip("#") for part in re.split(r"[,，\s]+", value) if part.strip())
+    return sorted({tag for tag in tags if tag})
+
+
+def merge_tags(*tag_groups: Any) -> list[str]:
+    tags: list[str] = []
+    for group in tag_groups:
+        if isinstance(group, str):
+            tags.append(group)
+        elif isinstance(group, list):
+            tags.extend(str(item) for item in group if item)
+    return sorted({tag.strip().lstrip("#") for tag in tags if tag and tag.strip().lstrip("#")})
+
+
+def _extract_note_metrics(dom_metrics: dict[str, Any]) -> dict[str, Any]:
     result: dict[str, Any] = {}
-    for label, key in [("点赞", "likes"), ("收藏", "collects"), ("评论", "comments"), ("分享", "shares")]:
-        raw = _extract_metric_around_label(text, label)
+    for key in ["likes", "collects", "comments", "shares"]:
+        raw = dom_metrics.get(key)
         value, raw_display, exact = parse_count(raw)
         result[f"{key}_value"] = value
         result[f"{key}_raw"] = raw_display
@@ -380,7 +488,7 @@ def _empty_note(note_id: str, status: str, status_note: str, raw: dict[str, Any]
         "top_comments": [],
         "raw_json": {"url": sanitize_url((raw or {}).get("url"))},
         "source": "dom",
-        "field_sources": _note_field_sources({}, "DOM"),
+        "field_sources": _note_field_sources({}, "DOM_EXACT"),
         "likes_value": None,
         "likes_raw": None,
         "likes_is_exact": None,

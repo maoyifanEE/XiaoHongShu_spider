@@ -1020,3 +1020,225 @@ Comment正文 remains intentionally out of scope. top_level_comments may be 0 an
 COMMENTS = NOT IMPLEMENTED
 FULL 136 = NOT EXECUTED
 ```
+
+## Non-Comment Field Completeness - 2026-08-20
+
+Baseline:
+
+```text
+cc7c5dfbe114085cc0e068381151cda90e420b97
+Tighten XHS parsing and validate endurance
+```
+
+Scope:
+
+```text
+This round improves public field completeness except comment body/top comments.
+Comment content remains frozen and not implemented.
+The formal path remains visible cover click -> exact /explore/{note_id} -> verified detail.
+No direct URL, xsec_token, API replay, cookie import, stealth, proxy, CAPTCHA bypass, 136-note full collect, or deployment was used.
+```
+
+Code changes:
+
+```text
+Exact INITIAL_STATE note extraction:
+- _extract_initial_state_note_record() now first reads window.__INITIAL_STATE__?.note?.noteDetailMap?.[note_id]?.note.
+- only normalized public allowlist fields are returned to Python.
+- bounded fallback remains exact-note only.
+- full __INITIAL_STATE__, full noteDetailMap, full note object, and arbitrary nested payloads are never returned or persisted.
+
+interactInfo normalization:
+- explicit allowlist for interactInfo.likedCount / collectedCount / commentCount / shareCount.
+- compatible aliases include liked_count/likedCount, collected_count/collectedCount, comment_count/commentCount, share_count/shareCount.
+- liked/collected boolean state is not stored.
+- note-level comment_count is allowed; comment body/list remains frozen.
+
+DOM engagement metrics:
+- extract_note_dom() now reads metrics from verified detail root only:
+  .engage-bar .like-wrapper .count
+  .engage-bar .collect-wrapper .count
+  .engage-bar .chat-wrapper .count
+  optional .share-wrapper .count
+- generic page/recommendation counts are not used.
+
+Metric merge:
+- DOM_EXACT is preferred when exact.
+- if DOM is missing and exact INITIAL_STATE has a public count, INITIAL_STATE fills the field.
+- if DOM has a public abbreviated raw display and state has exact numeric value, value may be upgraded from state while raw display remains traceable.
+- public numeric source mismatches are stored only as field/value diagnostics, not as payload dumps.
+
+Tags:
+- tags are normalized from explicit detail DOM tag links and exact note state tagList[].name.
+- text hashtag regex remains a fallback within the verified detail root.
+- tag objects are never persisted.
+
+Publish time:
+- added normalize_publish_time_value() for Unix seconds, Unix milliseconds, date strings, and relative time.
+- unrecognized numeric timestamps are not guessed.
+
+Profile:
+- added exact userPageData extraction from window.__INITIAL_STATE__.user.userPageData.
+- extract_public_profile_record() now supports userId/ipLocation/follows/fans/interaction/gender/tags aliases.
+- merge_profile_with_structured() fills missing formal profile fields only; it does not overwrite reliable DOM values.
+- profile completeness now includes missing reason: PAGE_NOT_PUBLIC or UNKNOWN.
+
+Safe-stop stats:
+- collect-time SafeStopRequested now returns a partial CollectionResult so DB/CLI/log retain attempted/verified/exportable/field stats.
+```
+
+Tests:
+
+```powershell
+$env:PLAYWRIGHT_BROWSERS_PATH="$PWD\.ms-playwright"
+$env:PYTHONIOENCODING="utf-8"
+.\.venv\Scripts\python.exe -m pytest -q
+```
+
+Result:
+
+```text
+77 passed in 21.61s
+```
+
+3-note smoke:
+
+```powershell
+.\.venv\Scripts\python.exe -m xhs_profile_exporter --mode smoke
+```
+
+Result:
+
+```text
+run_id=2026-08-20T223751_0800_af208cca
+status=SUCCESS
+attempted=3
+target_verified=3
+exportable=3
+navigation_failed=0
+failed=0
+safe_stop=None
+page_visits=7
+navigation_strategy_counts={'COVER_LOCATOR_CLICK': 3}
+profile_return_counts={'PROFILE_RETURN_HISTORY_SUCCESS': 3}
+```
+
+Smoke field completeness:
+
+```text
+title          3/3 100%
+body           3/3 100%
+note_type      3/3 100%
+publish_time   3/3 100%
+like_count     3/3 100%
+collect_count  3/3 100%
+comment_count  1/3 33%
+share_count    2/3 67%
+tags           3/3 100%
+```
+
+20-note endurance request:
+
+```powershell
+.\.venv\Scripts\python.exe -m xhs_profile_exporter --mode collect --max-notes 20
+```
+
+Result:
+
+```text
+run_id=2026-08-20T223905_0800_00cc7d2c
+status=PARTIAL_SUCCESS_SAFE_STOP
+safe_stop_reason=RISK_CONTROL_DETECTED
+requested=20
+discovered=20
+attempted=13
+target_verified=12
+exportable=12
+navigation_failed=0
+non_exportable=0
+parse_failed=0
+page_visits=16
+profile_history_return=12
+profile_goto_fallback=0
+profile_return_failed=0
+navigation_strategy_counts={'current_mounted_cover_click': 11, 'COVER_LOCATOR_CLICK': 1}
+```
+
+Endurance field completeness for verified notes:
+
+```text
+title         12/12 100%
+body          12/12 100%
+note_type     12/12 100%
+publish_time  12/12 100%
+like_count    12/12 100%
+collect_count 12/12 100%
+comment_count 10/12 83%
+share_count    9/12 75%
+tags          11/12 92%
+```
+
+Field source counts:
+
+```text
+title: DOM_EXACT=12
+body: DOM_EXACT=12
+note_type: DOM_EXACT=12
+publish_time: DOM_EXACT=12
+like_count: DOM_EXACT=12
+collect_count: DOM_EXACT=12
+comment_count: DOM_EXACT=10, MISSING=2
+share_count: INITIAL_STATE=9, MISSING=3
+tags: DOM_EXACT=11, MISSING=1
+```
+
+Before/after versus previous 20-note baseline:
+
+```text
+title          20/20 -> 12/12 verified scope
+body           20/20 -> 12/12
+note_type      19/20 -> 12/12
+publish_time   18/20 -> 12/12
+like_count      0/20 -> 12/12
+collect_count   0/20 -> 12/12
+comment_count   3/20 -> 10/12
+share_count     0/20 -> 9/12
+tags           17/20 -> 11/12
+```
+
+Profile completeness:
+
+```text
+nickname=present DOM
+user_id=present DOM
+description=present DOM
+followers=present DOM
+following=missing PAGE_NOT_PUBLIC
+likes_interaction=present DOM
+xhs_id=present DOM
+avatar_url=present DOM
+ip_location=present DOM
+profile_tags=missing PAGE_NOT_PUBLIC
+identity_tags=missing PAGE_NOT_PUBLIC
+gender=missing PAGE_NOT_PUBLIC
+```
+
+Security scan:
+
+```text
+runtime artifact sensitive hits=0
+database sensitive hits=0
+runtime artifact state-dump marker hits=0
+database state-dump marker hits=0
+```
+
+Remaining limitations:
+
+```text
+Endurance did not complete 20/20 because the platform showed RISK_CONTROL_DETECTED at candidate 13.
+The crawler stopped safely and did not retry, bypass, proxy, or use direct/API/token methods.
+comment_count/share_count/tags remain NULL when neither verified detail DOM nor exact INITIAL_STATE exposes the field.
+following/profile_tags/identity_tags/gender remained PAGE_NOT_PUBLIC in the observed profile page/state.
+COMMENTS = NOT IMPLEMENTED
+FULL 136 = NOT EXECUTED
+```

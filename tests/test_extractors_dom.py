@@ -2,7 +2,7 @@ import asyncio
 
 from playwright.async_api import async_playwright
 
-from xhs_profile_exporter.extractors import _extract_comments, extract_note_dom
+from xhs_profile_exporter.extractors import _extract_comments, extract_note_dom, merge_note_with_structured, normalize_public_note_record
 
 
 NOTE_ID = "66dabcde000000001f01abcd"
@@ -64,7 +64,12 @@ def test_strong_detail_root_extracts_fields():
     <section class="note-detail" style="display:block;width:800px;height:600px">
       <h1 id="detail-title">目标标题</h1>
       <div id="detail-desc">目标正文 #测试标签</div>
-      <div class="engage-bar">点赞 12 收藏 3 评论 4 分享 5</div>
+      <div class="engage-bar">
+        <div class="like-wrapper"><span class="count">12</span></div>
+        <div class="collect-wrapper"><span class="count">3</span></div>
+        <div class="chat-wrapper"><span class="count">4</span></div>
+        <div class="share-wrapper"><span class="count">5</span></div>
+      </div>
       <time>2026-08-20</time>
     </section>
     """
@@ -76,7 +81,7 @@ def test_strong_detail_root_extracts_fields():
     assert note["collects_value"] == 3
     assert note["comments_value"] == 4
     assert note["shares_value"] == 5
-    assert note["hashtags"] == ["#测试标签"]
+    assert note["hashtags"] == ["测试标签"]
 
 
 def test_sidebar_fake_count_does_not_pollute_note_metrics():
@@ -84,10 +89,18 @@ def test_sidebar_fake_count_does_not_pollute_note_metrics():
     <section class="note-detail" style="display:block;width:800px;height:600px">
       <h1 id="detail-title">目标标题</h1>
       <div id="detail-desc">目标正文</div>
-      <div class="engage-bar">点赞 1 收藏 2 评论 3 分享 4</div>
+      <div class="engage-bar">
+        <div class="like-wrapper"><span class="count">1</span></div>
+        <div class="collect-wrapper"><span class="count">2</span></div>
+        <div class="chat-wrapper"><span class="count">3</span></div>
+        <div class="share-wrapper"><span class="count">4</span></div>
+      </div>
     </section>
     <aside style="display:block;width:300px;height:600px">
-      <div class="recommendation">点赞 9999 收藏 8888 评论 7777 分享 6666</div>
+      <div class="recommendation">
+        <div class="like-wrapper"><span class="count">999万</span></div>
+        <div class="collect-wrapper"><span class="count">888万</span></div>
+      </div>
     </aside>
     """
     note = asyncio.run(_extract_from_html(html))
@@ -95,6 +108,60 @@ def test_sidebar_fake_count_does_not_pollute_note_metrics():
     assert note["collects_value"] == 2
     assert note["comments_value"] == 3
     assert note["shares_value"] == 4
+
+
+def test_normalize_exact_note_state_nested_interact_info():
+    record = normalize_public_note_record(
+        {
+            "title": "T",
+            "desc": "B",
+            "type": "normal",
+            "time": 1234567890000,
+            "interactInfo": {
+                "likedCount": "123",
+                "collectedCount": "45",
+                "commentCount": "6",
+                "shareCount": "7",
+                "liked": True,
+            },
+            "tagList": [{"name": "杭州"}, {"name": "旅行"}],
+            "privatePayload": {"x": 1},
+        },
+        NOTE_ID,
+    )
+    assert record["liked_count"] == "123"
+    assert record["collected_count"] == "45"
+    assert record["comment_count"] == "6"
+    assert record["share_count"] == "7"
+    assert record["tags"] == ["旅行", "杭州"]
+    assert "privatePayload" not in record
+    assert "liked" not in record
+
+
+def test_normalize_wrong_note_state_is_rejected():
+    assert normalize_public_note_record({"id": "aaaaaaaaaaaaaaaaaaaaaaaa", "title": "wrong"}, NOTE_ID) is None
+
+
+def test_zero_metrics_from_state_are_exact_values():
+    note = _base_note()
+    merged = merge_note_with_structured(
+        note,
+        {"note_id": NOTE_ID, "interactInfo": {"likedCount": "0", "collectedCount": 0, "commentCount": "0", "shareCount": 0}},
+    )
+    assert merged["likes_value"] == 0
+    assert merged["likes_is_exact"] is True
+    assert merged["collects_value"] == 0
+    assert merged["comments_value"] == 0
+    assert merged["shares_value"] == 0
+
+
+def test_dom_tags_and_state_tags_are_merged():
+    note = _base_note()
+    note["hashtags"] = ["杭州"]
+    note["field_sources"] = {"tags": "DOM_EXACT"}
+    merged = merge_note_with_structured(note, {"note_id": NOTE_ID, "tagList": [{"name": "杭州"}, {"name": "旅行"}]})
+    assert merged["hashtags"] == ["旅行", "杭州"]
+    assert merged["field_sources"]["tags"] == "DOM_EXACT+INITIAL_STATE"
 
 
 async def _extract_from_html(html: str):
@@ -105,3 +172,28 @@ async def _extract_from_html(html: str):
         note = await extract_note_dom(page, NOTE_ID, 3)
         await browser.close()
         return note
+
+
+def _base_note():
+    return {
+        "note_id": NOTE_ID,
+        "title": None,
+        "body": None,
+        "note_type": None,
+        "publish_time": None,
+        "hashtags": [],
+        "likes_value": None,
+        "likes_raw": None,
+        "likes_is_exact": None,
+        "collects_value": None,
+        "collects_raw": None,
+        "collects_is_exact": None,
+        "comments_value": None,
+        "comments_raw": None,
+        "comments_is_exact": None,
+        "shares_value": None,
+        "shares_raw": None,
+        "shares_is_exact": None,
+        "raw_json": {},
+        "field_sources": {},
+    }

@@ -20,6 +20,9 @@ from .extractors import (
     extract_profile_dom,
     extract_user_id,
     merge_note_with_structured,
+    merge_tags,
+    normalize_tag_names,
+    normalize_public_note_record,
     note_completeness_values,
 )
 from .exporter import export_excel
@@ -27,7 +30,7 @@ from .qa import run_offline_qa
 from .runtime import CollectionResult, OpenNoteResult, RunBudget, SafeStopRequested
 from .state import LoginStatus, RunStatus
 from .time_utils import now_iso
-from .utils import is_sensitive_key, sanitize_json, sanitize_url
+from .utils import is_sensitive_key, parse_count, sanitize_json, sanitize_url
 
 
 class Crawler:
@@ -96,10 +99,14 @@ class Crawler:
                     return {"run_id": run_id, "status": RunStatus.PARTIAL_SUCCESS_SAFE_STOP.value, "login_status": login_status.value}
 
                 profile = await extract_profile_dom(page, creator.url, creator.name)
+                profile_state_record = await self._extract_initial_state_profile_record(page, user_id)
+                if profile_state_record:
+                    self.structured_profile = {**profile_state_record, **(self.structured_profile or {})}
                 if self.structured_profile:
+                    profile = merge_profile_with_structured(profile, self.structured_profile)
                     profile["raw_json"] = {**(profile.get("raw_json") or {}), "structured": self.structured_profile}
                     profile["source"] = "dom+page_response"
-                profile_completeness = summarize_profile_fields(profile)
+                profile_completeness = summarize_profile_fields(profile, self.structured_profile)
                 self.db.save_profile_snapshot(user_id, profile)
                 self._write_raw("profile", user_id, run_id, profile)
                 self.logger.info("PROFILE captured nickname=%s followers=%s raw=%s", profile.get("nickname"), profile.get("followers_value"), profile.get("followers_raw"))
@@ -137,6 +144,7 @@ class Crawler:
                     notes_discovered=len(note_cards),
                     notes_completed=len(collection.exportable_ids),
                     notes_failed=len(collection.failed_ids),
+                    risk_detected=1 if collection.safe_stop_status == LoginStatus.RISK_CONTROL_DETECTED else 0,
                     notes={
                         "attempted": collection.attempted_ids,
                         "verified": collection.verified_ids,
@@ -348,7 +356,11 @@ class Crawler:
             except SafeStopRequested as stop:
                 result.safe_stop_status = stop.status
                 result.safe_stop_reason = stop.reason
-                raise
+                checkpoint.mark_safe_stop(stop.reason)
+                checkpoint.current_note_id = stop.note_id
+                checkpoint.save(self.app_config.base_dir / "data" / "checkpoints")
+                self.logger.info("SAFE_STOP collect phase=%s note_id=%s status=%s reason=%s", stop.phase, stop.note_id, stop.status.value, stop.reason)
+                break
             except PlaywrightTimeoutError as exc:
                 errors += 1
                 result.failed_ids.append(note_id)
@@ -670,7 +682,39 @@ class Crawler:
             data = await page.evaluate(
                 """
                 (noteId) => {
-                  const allow = new Set(["id", "note_id", "title", "display_title", "desc", "content", "type", "note_type", "model_type", "time", "publish_time", "liked_count", "collected_count", "comment_count", "share_count"]);
+                  const normalize = (value) => {
+                    if (!value || typeof value !== "object") return null;
+                    const id = value.note_id || value.noteId || value.id;
+                    if (id && id !== noteId) return null;
+                    const interact = value.interactInfo && typeof value.interactInfo === "object" ? value.interactInfo : {};
+                    const firstScalar = (keys, source) => {
+                      for (const key of keys) {
+                        if (source && Object.prototype.hasOwnProperty.call(source, key) && (typeof source[key] !== "object" || source[key] === null)) return source[key];
+                      }
+                      return undefined;
+                    };
+                    const tags = Array.isArray(value.tagList)
+                      ? value.tagList.map((item) => item && typeof item === "object" ? (item.name || item.tagName || item.title) : item).filter(Boolean).map(String)
+                      : [];
+                    const out = {
+                      note_id: noteId,
+                      id,
+                      title: firstScalar(["title", "display_title", "displayTitle"], value),
+                      display_title: firstScalar(["display_title", "displayTitle"], value),
+                      desc: firstScalar(["desc", "content"], value),
+                      type: firstScalar(["type", "note_type", "noteType", "model_type", "modelType"], value),
+                      time: firstScalar(["time", "publish_time", "publishTime"], value),
+                      liked_count: firstScalar(["liked_count", "likedCount"], value) ?? firstScalar(["liked_count", "likedCount"], interact),
+                      collected_count: firstScalar(["collected_count", "collectedCount"], value) ?? firstScalar(["collected_count", "collectedCount"], interact),
+                      comment_count: firstScalar(["comment_count", "commentCount"], value) ?? firstScalar(["comment_count", "commentCount"], interact),
+                      share_count: firstScalar(["share_count", "shareCount"], value) ?? firstScalar(["share_count", "shareCount"], interact),
+                      tags
+                    };
+                    return Object.fromEntries(Object.entries(out).filter(([, item]) => item !== undefined && item !== null && item !== "" && !(Array.isArray(item) && item.length === 0)));
+                  };
+                  const exact = window.__INITIAL_STATE__?.note?.noteDetailMap?.[noteId]?.note;
+                  const direct = normalize(exact);
+                  if (direct) return direct;
                   const walk = (root) => {
                     if (!root || typeof root !== "object") return null;
                     const seen = new Set();
@@ -681,13 +725,7 @@ class Crawler:
                       scanned += 1;
                       if (!value || typeof value !== "object" || seen.has(value)) continue;
                       seen.add(value);
-                      if (value.id === noteId || value.note_id === noteId) {
-                        const out = {};
-                        for (const key of Object.keys(value)) {
-                          if (allow.has(key) && (typeof value[key] !== "object" || value[key] === null)) out[key] = value[key];
-                        }
-                        return out;
-                      }
+                      if (value.id === noteId || value.note_id === noteId || value.noteId === noteId) return normalize(value);
                       let children = [];
                       try { children = Object.values(value); } catch { children = []; }
                       for (const item of children) {
@@ -703,7 +741,65 @@ class Crawler:
             )
         except Exception:
             return None
-        return sanitize_json(data) if data else None
+        return normalize_public_note_record(sanitize_json(data), note_id) if data else None
+
+    async def _extract_initial_state_profile_record(self, page: Page, creator_id: str) -> dict[str, Any] | None:
+        try:
+            data = await page.evaluate(
+                """
+                (creatorId) => {
+                  const normalize = (value) => {
+                    if (!value || typeof value !== "object") return null;
+                    const id = value.userId || value.user_id || value.id;
+                    if (id !== creatorId) return null;
+                    const tags = Array.isArray(value.tags)
+                      ? value.tags.map((item) => item && typeof item === "object" ? (item.name || item.tagName || item.title) : item).filter(Boolean).map(String)
+                      : [];
+                    const out = {
+                      user_id: creatorId,
+                      nickname: value.nickname || value.name,
+                      xhs_id: value.redId || value.red_id || value.xhs_id,
+                      bio: value.desc || value.bio,
+                      avatar_url: value.avatar || value.avatar_url || value.image,
+                      ip_location: value.ipLocation || value.ip_location,
+                      following: value.follows ?? value.following,
+                      followers: value.fans ?? value.followers ?? value.follower_count,
+                      interactions: value.interaction ?? value.liked ?? value.liked_count ?? value.interaction_count,
+                      gender: value.gender,
+                      tags
+                    };
+                    return Object.fromEntries(Object.entries(out).filter(([, item]) => item !== undefined && item !== null && item !== "" && !(Array.isArray(item) && item.length === 0)));
+                  };
+                  const direct = normalize(window.__INITIAL_STATE__?.user?.userPageData);
+                  if (direct) return direct;
+                  const walk = (root) => {
+                    if (!root || typeof root !== "object") return null;
+                    const seen = new Set();
+                    const queue = [root];
+                    let scanned = 0;
+                    while (queue.length && scanned < 2000) {
+                      const value = queue.shift();
+                      scanned += 1;
+                      if (!value || typeof value !== "object" || seen.has(value)) continue;
+                      seen.add(value);
+                      const found = normalize(value);
+                      if (found) return found;
+                      let children = [];
+                      try { children = Object.values(value); } catch { children = []; }
+                      for (const item of children) {
+                        if (item && typeof item === "object" && !seen.has(item)) queue.push(item);
+                      }
+                    }
+                    return null;
+                  };
+                  return walk(window.__INITIAL_STATE__);
+                }
+                """,
+                creator_id,
+            )
+        except Exception:
+            return None
+        return extract_public_profile_record(sanitize_json(data), creator_id) if data else None
 
     async def _return_to_creator_profile(self, page: Page, profile_url: str, note_id: str) -> dict[str, Any]:
         creator_id = extract_user_id(profile_url)
@@ -844,7 +940,7 @@ def record_note_field_stats(result: CollectionResult, note: dict[str, Any]) -> N
         result.record_field(field_name, field_value_present(value), sources.get(field_name))
 
 
-def summarize_profile_fields(profile: dict[str, Any]) -> dict[str, dict[str, Any]]:
+def summarize_profile_fields(profile: dict[str, Any], structured: dict[str, Any] | None = None) -> dict[str, dict[str, Any]]:
     fields = {
         "nickname": profile.get("nickname"),
         "user_id": extract_user_id(profile.get("canonical_url") or "") if profile.get("canonical_url") else None,
@@ -859,10 +955,16 @@ def summarize_profile_fields(profile: dict[str, Any]) -> dict[str, dict[str, Any
         "identity_tags": profile.get("identity_tags"),
         "gender": profile.get("gender"),
     }
-    return {
-        field: {"present": field_value_present(value), "source": "DOM" if field_value_present(value) else "MISSING"}
-        for field, value in fields.items()
-    }
+    sources = profile.get("field_sources") or {}
+    summary = {}
+    for field, value in fields.items():
+        present = field_value_present(value)
+        summary[field] = {
+            "present": present,
+            "source": sources.get(field) or ("DOM" if present else "MISSING"),
+            "reason": None if present else ("PAGE_NOT_PUBLIC" if structured is not None else "UNKNOWN"),
+        }
+    return summary
 
 
 def field_value_present(value: Any) -> bool:
@@ -942,6 +1044,7 @@ NOTE_PUBLIC_ALLOWLIST = {
 PROFILE_PUBLIC_FIELD_ALIASES = {
     "user_id": "user_id",
     "id": "user_id",
+    "userId": "user_id",
     "nickname": "nickname",
     "name": "nickname",
     "red_id": "xhs_id",
@@ -952,6 +1055,8 @@ PROFILE_PUBLIC_FIELD_ALIASES = {
     "avatar": "avatar_url",
     "avatar_url": "avatar_url",
     "image": "avatar_url",
+    "ipLocation": "ip_location",
+    "ip_location": "ip_location",
     "fans": "followers",
     "followers": "followers",
     "follower_count": "followers",
@@ -960,6 +1065,9 @@ PROFILE_PUBLIC_FIELD_ALIASES = {
     "liked": "interactions",
     "liked_count": "interactions",
     "interaction_count": "interactions",
+    "interaction": "interactions",
+    "interactions": "interactions",
+    "gender": "gender",
     "tags": "tags",
 }
 
@@ -967,9 +1075,11 @@ PROFILE_PUBLIC_FIELD_ALIASES = {
 def extract_public_note_records(value: Any) -> dict[str, dict[str, Any]]:
     records: dict[str, dict[str, Any]] = {}
     if isinstance(value, dict):
-        note_id = value.get("note_id") or value.get("id")
+        note_id = value.get("note_id") or value.get("id") or value.get("noteId")
         if isinstance(note_id, str) and len(note_id) == 24:
-            records[note_id] = sanitize_json({key: value.get(key) for key in NOTE_PUBLIC_ALLOWLIST if key in value})
+            record = normalize_public_note_record(value, note_id)
+            if record:
+                records[note_id] = sanitize_json(record)
         for item in value.values():
             records.update(extract_public_note_records(item))
     elif isinstance(value, list):
@@ -980,7 +1090,7 @@ def extract_public_note_records(value: Any) -> dict[str, dict[str, Any]]:
 
 def extract_public_profile_record(value: Any, creator_id: str) -> dict[str, Any] | None:
     if isinstance(value, dict):
-        candidate_id = value.get("user_id") or value.get("id")
+        candidate_id = value.get("user_id") or value.get("userId") or value.get("id")
         if candidate_id == creator_id:
             record: dict[str, Any] = {"user_id": creator_id}
             for key, out_key in PROFILE_PUBLIC_FIELD_ALIASES.items():
@@ -991,6 +1101,8 @@ def extract_public_profile_record(value: Any, creator_id: str) -> dict[str, Any]
                     continue
                 if out_key == "avatar_url":
                     record[out_key] = sanitize_url(str(item)) if item else None
+                elif out_key == "tags":
+                    record[out_key] = normalize_profile_tags(item)
                 else:
                     record[out_key] = sanitize_json(item)
             return {key: item for key, item in record.items() if item is not None}
@@ -1008,3 +1120,53 @@ def extract_public_profile_record(value: Any, creator_id: str) -> dict[str, Any]
 
 def is_public_profile_payload(value: Any, creator_id: str) -> bool:
     return extract_public_profile_record(value, creator_id) is not None
+
+
+def merge_profile_with_structured(profile: dict[str, Any], structured: dict[str, Any]) -> dict[str, Any]:
+    merged = dict(profile)
+    field_sources = dict(merged.get("field_sources") or {})
+    if structured.get("nickname") and not merged.get("nickname"):
+        merged["nickname"] = structured.get("nickname")
+        field_sources["nickname"] = "STRUCTURED_PUBLIC"
+    if structured.get("xhs_id") and not merged.get("xhs_id"):
+        merged["xhs_id"] = structured.get("xhs_id")
+        field_sources["xhs_id"] = "STRUCTURED_PUBLIC"
+    if structured.get("bio") and not merged.get("bio"):
+        merged["bio"] = structured.get("bio")
+        field_sources["description"] = "STRUCTURED_PUBLIC"
+    if structured.get("avatar_url") and not merged.get("avatar_url"):
+        merged["avatar_url"] = sanitize_url(str(structured.get("avatar_url")))
+        field_sources["avatar_url"] = "STRUCTURED_PUBLIC"
+    if structured.get("ip_location") and not merged.get("ip_location"):
+        merged["ip_location"] = structured.get("ip_location")
+        field_sources["ip_location"] = "STRUCTURED_PUBLIC"
+    for source_key, prefix in [("following", "following"), ("followers", "followers"), ("interactions", "total_interactions")]:
+        if structured.get(source_key) is not None and merged.get(f"{prefix}_value") is None:
+            value, raw, exact = parse_count(structured.get(source_key))
+            merged[f"{prefix}_value"] = value
+            merged[f"{prefix}_raw"] = raw
+            merged[f"{prefix}_is_exact"] = exact
+            field_sources[{"following": "following", "followers": "followers", "total_interactions": "likes_interaction"}[prefix]] = "STRUCTURED_PUBLIC"
+    if structured.get("gender") not in (None, "", 0, "0") and merged.get("gender") is None:
+        merged["gender"] = normalize_gender(structured.get("gender"))
+        field_sources["gender"] = "STRUCTURED_PUBLIC"
+    if structured.get("tags") and not merged.get("profile_tags"):
+        merged["profile_tags"] = normalize_profile_tags(structured.get("tags"))
+        field_sources["profile_tags"] = "STRUCTURED_PUBLIC"
+    merged["field_sources"] = field_sources
+    return merged
+
+
+def normalize_profile_tags(value: Any) -> list[str]:
+    return normalize_tag_names(value)
+
+
+def normalize_gender(value: Any) -> str | None:
+    if value in (None, "", 0, "0"):
+        return None
+    text = str(value)
+    if text in {"1", "male", "男"}:
+        return "男"
+    if text in {"2", "female", "女"}:
+        return "女"
+    return text

@@ -9,6 +9,7 @@ data/backups/
 data/raw/
 output/
 screenshots/errors/
+screenshots/navigation_probe/
 *.cookie
 *.token
 __pycache__/

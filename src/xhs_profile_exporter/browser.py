@@ -8,6 +8,7 @@ from typing import Any, Callable
 from playwright.async_api import BrowserContext, Page, async_playwright
 
 from .state import LoginStatus
+from .utils import sanitize_url
 
 VERIFICATION_WORDS = ["验证码", "滑块", "扫码验证", "短信验证", "安全验证", "人机验证", "captcha"]
 RISK_WORDS = ["访问频繁", "风险", "异常访问", "当前环境异常", "请稍后再试", "账号异常"]
@@ -22,6 +23,7 @@ class BrowserSession:
         self.context: BrowserContext | None = None
         self.browser_version: str | None = None
         self.response_callback: Callable[[str, Any], None] | None = None
+        self._response_tasks: set[asyncio.Task] = set()
 
     async def __aenter__(self) -> "BrowserSession":
         browser_cfg = self.config.get("browser", {})
@@ -39,10 +41,12 @@ class BrowserSession:
             timezone_id="Asia/Shanghai",
         )
         self.context.set_default_navigation_timeout(int(browser_cfg.get("navigation_timeout_ms", 60000)))
+        setattr(self.context, "_xhs_browser_session", self)
         self.browser_version = self.context.browser.version if self.context.browser else None
         return self
 
     async def __aexit__(self, exc_type, exc, tb) -> None:
+        await self.flush_response_tasks(timeout=5)
         if self.context:
             await self.context.close()
         if self.playwright:
@@ -53,20 +57,41 @@ class BrowserSession:
         if not self.context:
             raise RuntimeError("Browser context 尚未启动")
         page = self.context.pages[0] if self.context.pages else await self.context.new_page()
-        page.on("response", lambda response: asyncio.create_task(self._capture_response(response)))
+        page.on("response", self._schedule_response_capture)
         return page
 
-    async def check_login(self, page: Page, target_url: str) -> LoginStatus:
-        self.logger.info("LOGIN_STATUS checking url=%s", target_url)
+    def _schedule_response_capture(self, response: Any) -> None:
+        task = asyncio.create_task(self._capture_response(response))
+        self._response_tasks.add(task)
+        task.add_done_callback(self._response_tasks.discard)
+
+    async def flush_response_tasks(self, timeout: float = 10) -> None:
+        if not self._response_tasks:
+            return
+        done, pending = await asyncio.wait(self._response_tasks, timeout=timeout)
+        for task in done:
+            if task.exception():
+                self.logger.info("BROWSER response_task_failed error_type=%s", type(task.exception()).__name__)
+        if pending:
+            self.logger.info("BROWSER response_task_pending count=%s", len(pending))
+
+    async def navigate_to_login_target(self, page: Page, target_url: str) -> None:
+        self.logger.info("LOGIN_NAVIGATE target=creator_profile")
         await page.goto(target_url, wait_until="domcontentloaded")
         await page.wait_for_timeout(4000)
+
+    async def check_login(self, page: Page, target_url: str) -> LoginStatus:
+        await self.navigate_to_login_target(page, target_url)
+        return await self.inspect_login_state(page)
+
+    async def inspect_login_state(self, page: Page) -> LoginStatus:
         profile_ready = await detect_profile_ready(page)
         session = await detect_session_indicators(page)
         self.logger.info(
             "LOGIN_CHECK profile_public_visible=%s session_ready=%s current_url=%s body_chars=%s login_form=%s login_text=%s note_links=%s session_words=%s",
             profile_ready["ready"],
             session["ready"],
-            page.url,
+            sanitize_url(page.url),
             profile_ready["textLength"],
             session["loginInputs"],
             session["loginText"],
@@ -76,6 +101,10 @@ class BrowserSession:
         if session["ready"]:
             self.logger.info("LOGIN_STATUS=LOGIN_OK account session indicators detected")
             return LoginStatus.LOGIN_OK
+        text = await safe_body_text(page)
+        if any(word in text for word in ["登录", "注册"]) and any(word in text for word in ["手机号", "扫码"]):
+            self.logger.info("LOGIN_STATUS=LOGIN_EXPIRED login panel detected")
+            return LoginStatus.LOGIN_EXPIRED
         status = await detect_page_status(page)
         if status in {LoginStatus.RISK_CONTROL_DETECTED, LoginStatus.HUMAN_VERIFICATION_REQUIRED}:
             self.logger.info("LOGIN_STATUS=%s", status.value)
@@ -83,12 +112,11 @@ class BrowserSession:
         if profile_ready["ready"]:
             self.logger.info("LOGIN_STATUS=LOGIN_EXPIRED public profile visible but account session not detected")
             return LoginStatus.LOGIN_EXPIRED
-        text = await safe_body_text(page)
-        if any(word in text for word in ["登录", "注册"]) and any(word in text for word in ["手机号", "验证码", "扫码"]):
-            self.logger.info("LOGIN_STATUS=LOGIN_EXPIRED login panel detected")
-            return LoginStatus.LOGIN_EXPIRED
-        self.logger.info("LOGIN_STATUS=LOGIN_OK")
-        return LoginStatus.LOGIN_OK
+        if len(text.strip()) < 20:
+            self.logger.info("LOGIN_STATUS=PAGE_NOT_READY text_length=%s", len(text.strip()))
+            return LoginStatus.PAGE_NOT_READY
+        self.logger.info("LOGIN_STATUS=LOGIN_UNKNOWN fail_closed")
+        return LoginStatus.LOGIN_UNKNOWN
 
     async def wait_for_login(self, page: Page, target_url: str) -> LoginStatus:
         timeout_minutes = int(self.config.get("browser", {}).get("login_timeout_minutes", 30))
@@ -98,9 +126,10 @@ class BrowserSession:
         print("完成后无需关闭浏览器，程序会自动检测。")
         self.logger.info("LOGIN_STATUS waiting_for_human_login timeout_minutes=%s", timeout_minutes)
         while asyncio.get_event_loop().time() < deadline:
-            status = await self.check_login(page, target_url)
+            status = await self.inspect_login_state(page)
             if status == LoginStatus.LOGIN_OK:
-                return status
+                await self.navigate_to_login_target(page, target_url)
+                return await self.inspect_login_state(page)
             if status == LoginStatus.RISK_CONTROL_DETECTED:
                 return status
             await page.wait_for_timeout(5000)
@@ -179,17 +208,18 @@ async def detect_session_indicators(page: Page) -> dict[str, Any]:
               const buttons = Array.from(document.querySelectorAll('button, a, [role=button]')).map(el => (el.innerText || el.getAttribute("aria-label") || "").trim()).filter(Boolean);
               const loginText = buttons.filter(value => /登录|注册|扫码/.test(value)).slice(0, 5);
               const sessionWords = ["发布", "消息", "通知", "创作中心", "我的"].filter(value => text.includes(value));
-              const avatarLike = document.querySelectorAll('[class*=avatar], [class*=user-avatar], img[src*="sns-avatar"], img[src*="avatar"]').length;
-              return { loginInputs, loginText, sessionWords, avatarLike, textLength: text.length };
+              const accountControls = Array.from(document.querySelectorAll('header button, header a, nav button, nav a, [data-testid*="user" i], [aria-label*="用户"], [aria-label*="账号"], [aria-label*="个人"]')).length;
+              return { loginInputs, loginText, sessionWords, accountControls, textLength: text.length };
             }
             """
         )
     except Exception:
-        return {"ready": False, "loginInputs": None, "loginText": [], "sessionWords": [], "avatarLike": None}
+        return {"ready": False, "loginInputs": None, "loginText": [], "sessionWords": [], "accountControls": None}
     has_login_prompt = bool(indicators.get("loginText")) or int(indicators.get("loginInputs") or 0) > 0
     ready = (
         not has_login_prompt
-        and (len(indicators.get("sessionWords") or []) >= 2 or int(indicators.get("avatarLike") or 0) >= 1)
+        and len(indicators.get("sessionWords") or []) >= 2
+        and int(indicators.get("accountControls") or 0) >= 1
     )
     indicators["ready"] = ready
     return indicators

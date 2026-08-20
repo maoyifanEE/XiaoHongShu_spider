@@ -21,6 +21,7 @@ SENSITIVE_KEYS = {
     "passwd",
     "xsec_token",
 }
+SENSITIVE_KEY_PARTS = ("token", "cookie", "auth", "session", "password", "passwd", "xsec")
 
 
 def ensure_dirs(base_dir: Path) -> None:
@@ -60,11 +61,25 @@ def sanitize_url(url: str | None) -> str | None:
     if not url:
         return url
     parts = urlsplit(url)
+    if not parts.scheme or not parts.netloc:
+        return redact_sensitive_text(url)
     kept = []
     for key, value in parse_qsl(parts.query, keep_blank_values=True):
-        if key.lower() not in SENSITIVE_KEYS and "token" not in key.lower():
+        key_text = key.lower()
+        if key_text not in SENSITIVE_KEYS and not any(part in key_text for part in SENSITIVE_KEY_PARTS):
             kept.append((key, value))
     return urlunsplit((parts.scheme, parts.netloc, parts.path, urlencode(kept), ""))
+
+
+def redact_sensitive_text(text: str) -> str:
+    redacted = text
+    redacted = re.sub(
+        r"(?i)(?:xsec_token|token|authorization|session|cookie|password|bearer)=([^&\s]+)",
+        "[REDACTED_CREDENTIAL]",
+        redacted,
+    )
+    redacted = re.sub(r"(?i)Bearer\s+[A-Za-z0-9._~+/=-]+", "[REDACTED_CREDENTIAL]", redacted)
+    return redacted
 
 
 def canonical_profile_url(user_id: str) -> str:
@@ -104,14 +119,17 @@ def sanitize_json(value: Any) -> Any:
         clean = {}
         for key, item in value.items():
             key_text = str(key).lower()
-            if key_text in SENSITIVE_KEYS or "token" in key_text or "cookie" in key_text:
-                clean[key] = "[REDACTED]"
+            if key_text in SENSITIVE_KEYS or any(part in key_text for part in SENSITIVE_KEY_PARTS):
+                continue
             else:
                 clean[key] = sanitize_json(item)
         return clean
     if isinstance(value, list):
         return [sanitize_json(item) for item in value]
     if isinstance(value, str):
+        if "://" in value:
+            value = sanitize_url(value) or value
+        value = redact_sensitive_text(value)
         if len(value) > 4000:
             return value[:4000] + "...[TRUNCATED]"
         return value
@@ -121,4 +139,3 @@ def sanitize_json(value: Any) -> Any:
 def safe_filename(text: str) -> str:
     cleaned = re.sub(r'[\\/:*?"<>|]+', "_", text).strip()
     return cleaned or "xhs_export"
-

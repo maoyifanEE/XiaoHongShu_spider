@@ -126,20 +126,44 @@ async def discover_note_cards(page: Any) -> list[dict[str, Any]]:
 async def extract_note_dom(page: Any, note_id: str, top_n: int = 3) -> dict[str, Any]:
     data = await page.evaluate(
         """
-        () => {
-          const text = document.body ? document.body.innerText : "";
-          const titleEl = document.querySelector("h1, [class*=title]");
-          const descEl = document.querySelector('[class*=desc], [class*=content], .note-content');
+        (noteId) => {
           const meta = Object.fromEntries(Array.from(document.querySelectorAll("meta")).map(m => [m.getAttribute("name") || m.getAttribute("property") || "", m.getAttribute("content") || ""]));
-          const comments = Array.from(document.querySelectorAll('[class*=comment-item], [class*=commentItem], [class*=comment]')).slice(0, 12).map((el) => ({
-             text: el.innerText || "",
-             id: el.getAttribute("data-id") || el.id || null,
-             classes: el.className || ""
-          }));
-          return {text, title: titleEl ? titleEl.innerText : "", desc: descEl ? descEl.innerText : "", meta, comments, url: location.href};
+          const roots = Array.from(document.querySelectorAll('[role="dialog"], article, main, [class*="note-detail"], [class*="noteDetail"], [class*="detail"]'));
+          const visibleRoots = roots.filter((el) => {
+            const rect = el.getBoundingClientRect();
+            const style = window.getComputedStyle(el);
+            return rect.width > 0 && rect.height > 0 && style.display !== "none" && style.visibility !== "hidden";
+          });
+          const root = visibleRoots.find((el) => (el.innerText || "").includes(noteId) || el.querySelector(`a[href*="${noteId}"]`)) || visibleRoots.find((el) => (el.innerText || "").length > 80);
+          if (!root) return {rootFound: false, meta, url: location.href};
+          const q = (selectors) => selectors.map((sel) => root.querySelector(sel)).find(Boolean);
+          const titleEl = q(["h1", "[class*=title]", "[data-testid*=title]"]);
+          const descEl = q(["[class*=desc]", "[class*=content]", ".note-content", "[data-testid*=content]"]);
+          const commentEls = Array.from(root.querySelectorAll('[class*=comment-item], [class*=commentItem], [data-testid*=comment]')).slice(0, 20);
+          const comments = commentEls.map((el) => {
+             const childComment = el.parentElement && el.parentElement.closest('[class*=comment-item], [class*=commentItem], [data-testid*=comment]') !== el;
+             return {
+               text: el.innerText || "",
+               id: el.getAttribute("data-id") || el.id || null,
+               classes: el.className || "",
+               nested: Boolean(childComment),
+             };
+          });
+          return {
+            rootFound: true,
+            text: root.innerText || "",
+            title: titleEl ? titleEl.innerText : "",
+            desc: descEl ? descEl.innerText : "",
+            meta,
+            comments,
+            url: location.href
+          };
         }
-        """
+        """,
+        note_id,
     )
+    if not data.get("rootFound"):
+        return _empty_note(note_id, "PARSE_PARTIAL", "未找到可靠的可见笔记详情 root", data)
     text = data.get("text") or ""
     unavailable_status = _detect_unavailable_status(text)
     title = _clean_line(data.get("title")) or _meta_title(data.get("meta", {}))
@@ -153,7 +177,7 @@ async def extract_note_dom(page: Any, note_id: str, top_n: int = 3) -> dict[str,
         "note_id": note_id,
         "canonical_url": canonical_note_url(note_id),
         "is_pinned": "置顶" in text[:300],
-        "note_type": note_type_from_text(text) or ("视频" if "video" in json.dumps(data.get("meta", {})).lower() else "图文"),
+        "note_type": note_type_from_text(text) or ("视频" if "video" in json.dumps(data.get("meta", {})).lower() else None),
         "title": title,
         "body": body,
         "hashtags": hashtags,
@@ -257,15 +281,22 @@ def _extract_comments(items: list[dict[str, Any]], top_n: int) -> list[dict[str,
     comments = []
     seen = set()
     for item in items:
+        if item.get("nested"):
+            continue
         text = _clean_multiline(item.get("text") or "")
         if not text or text in seen:
             continue
-        if any(word in text for word in ["全部评论", "暂无评论", "展开", "回复"]):
+        if any(word in text for word in ["全部评论", "暂无评论"]):
             continue
         seen.add(text)
         lines = [line for line in text.splitlines() if line.strip()]
         author = lines[0] if lines else None
-        body = "\n".join(lines[1:]) if len(lines) > 1 else text
+        body_lines = [
+            line
+            for line in lines[1:]
+            if line not in {"回复", "点赞", "展开回复"} and not line.startswith("展开") and not line.endswith("回复")
+        ]
+        body = "\n".join(body_lines) if body_lines else (lines[1] if len(lines) > 1 else text)
         like_raw = _extract_metric_around_label(text, "赞")
         value, raw, exact = parse_count(like_raw)
         comments.append(
@@ -286,6 +317,39 @@ def _extract_comments(items: list[dict[str, Any]], top_n: int) -> list[dict[str,
         if len(comments) >= top_n:
             break
     return comments
+
+
+def _empty_note(note_id: str, status: str, status_note: str, raw: dict[str, Any] | None = None) -> dict[str, Any]:
+    return {
+        "note_id": note_id,
+        "canonical_url": canonical_note_url(note_id),
+        "is_pinned": None,
+        "note_type": None,
+        "title": None,
+        "body": None,
+        "hashtags": [],
+        "publish_time": None,
+        "publish_time_raw": None,
+        "updated_time": None,
+        "updated_time_raw": None,
+        "status": status,
+        "status_note": status_note,
+        "top_comments": [],
+        "raw_json": {"url": sanitize_url((raw or {}).get("url"))},
+        "source": "dom",
+        "likes_value": None,
+        "likes_raw": None,
+        "likes_is_exact": None,
+        "collects_value": None,
+        "collects_raw": None,
+        "collects_is_exact": None,
+        "comments_value": None,
+        "comments_raw": None,
+        "comments_is_exact": None,
+        "shares_value": None,
+        "shares_raw": None,
+        "shares_is_exact": None,
+    }
 
 
 def _extract_labeled_counts(text: str, labels: list[str]) -> dict[str, str]:

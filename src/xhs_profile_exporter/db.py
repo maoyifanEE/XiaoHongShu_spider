@@ -8,7 +8,7 @@ from pathlib import Path
 from typing import Any, Iterable
 
 from .time_utils import now_iso
-from .utils import canonical_note_url, stable_hash
+from .utils import canonical_note_url, sanitize_json, stable_hash
 
 
 SCHEMA_VERSION = 1
@@ -235,7 +235,7 @@ class Database:
                 snapshot.get("total_interactions_raw"),
                 _bool(snapshot.get("total_interactions_is_exact")),
                 snapshot.get("gender"),
-                json.dumps(snapshot.get("raw_json"), ensure_ascii=False),
+                json.dumps(sanitize_json(snapshot.get("raw_json")), ensure_ascii=False),
                 snapshot.get("source", "dom"),
             ),
         )
@@ -298,7 +298,7 @@ class Database:
                     note.get("updated_time"),
                     note.get("updated_time_raw"),
                     content_hash,
-                    json.dumps(note.get("raw_json"), ensure_ascii=False),
+                    json.dumps(sanitize_json(note.get("raw_json")), ensure_ascii=False),
                     note.get("source", "dom"),
                 ),
             )
@@ -354,7 +354,7 @@ class Database:
                 )
 
     def save_raw(self, run_id: str, entity_type: str, entity_id: str, source: str, raw: Any) -> None:
-        payload = json.dumps(raw, ensure_ascii=False, sort_keys=True, default=str)
+        payload = json.dumps(sanitize_json(raw), ensure_ascii=False, sort_keys=True, default=str)
         self.conn.execute(
             """
             INSERT OR IGNORE INTO raw_records
@@ -437,4 +437,3 @@ def _bool(value: Any) -> int | None:
     if value is None:
         return None
     return 1 if bool(value) else 0
-

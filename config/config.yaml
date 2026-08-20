@@ -32,4 +32,3 @@ collection:
   download_media: false
   smoke_note_limit: 3
   smoke_max_attempts: 12
-  online_qa_sample_size: 5

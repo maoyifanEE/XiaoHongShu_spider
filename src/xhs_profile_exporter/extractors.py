@@ -263,7 +263,7 @@ def merge_note_with_structured(note: dict[str, Any], structured: dict[str, Any] 
             field_sources["title"] = _structured_field_source(structured_field_sources, "title")
         if not note.get("body") and desc:
             note["body"] = desc
-            field_sources["body"] = _structured_field_source(structured_field_sources, "desc")
+            field_sources["body"] = _structured_field_source(structured_field_sources, "body")
         structured_type = _structured_note_type(item)
         if not note.get("note_type") and structured_type:
             note["note_type"] = structured_type
@@ -283,7 +283,7 @@ def merge_note_with_structured(note: dict[str, Any], structured: dict[str, Any] 
                 note[f"{out}_value"] = state_value
                 note[f"{out}_raw"] = state_raw
                 note[f"{out}_is_exact"] = state_exact
-                field_sources[_metric_field_name(out)] = _structured_field_source(structured_field_sources, key)
+                field_sources[_metric_field_name(out)] = _structured_field_source(structured_field_sources, _metric_field_name(out))
             elif state_value is not None and current_value != state_value:
                 note.setdefault("raw_json", {}).setdefault("metric_source_mismatch", []).append(
                     {"field": _metric_field_name(out), "dom_value": current_value, "state_value": state_value}
@@ -291,7 +291,7 @@ def merge_note_with_structured(note: dict[str, Any], structured: dict[str, Any] 
                 if state_exact is True and current_exact is not True:
                     note[f"{out}_value"] = state_value
                     note[f"{out}_is_exact"] = True
-                    field_sources[_metric_field_name(out)] = _structured_field_source(structured_field_sources, key)
+                    field_sources[_metric_field_name(out)] = _structured_field_source(structured_field_sources, _metric_field_name(out))
         publish_value = item.get("publish_time") or item.get("time")
         if publish_value is not None and not note.get("publish_time"):
             note["publish_time"], note["publish_time_raw"] = normalize_publish_time_value(publish_value)
@@ -299,10 +299,12 @@ def merge_note_with_structured(note: dict[str, Any], structured: dict[str, Any] 
         if item.get("tags"):
             before_tags = note.get("hashtags") or []
             merged_tags = merge_tags(note.get("hashtags") or [], item.get("tags") or [])
+            structured_tag_source = _structured_field_source(structured_field_sources, "tags")
             if merged_tags != before_tags:
                 note["hashtags"] = merged_tags
-                structured_tag_source = _structured_field_source(structured_field_sources, "tags")
                 field_sources["tags"] = structured_tag_source if not before_tags else f"DOM_EXACT+{structured_tag_source}"
+            elif item.get("tags") and not before_tags:
+                field_sources["tags"] = structured_tag_source
         break
     note["field_sources"] = _normalize_note_field_sources(note, field_sources)
     return note

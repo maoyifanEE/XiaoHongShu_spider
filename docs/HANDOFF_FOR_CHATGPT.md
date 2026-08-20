@@ -1380,3 +1380,85 @@ pytest: 98 passed in 39.22s
 git diff --check: passed, only Windows LF/CRLF warnings
 qa-only: passed=True
 ```
+
+## Relational Note-ID Isolation - 2026-08-20
+
+Baseline:
+
+```text
+dd1ad75e768088b6ce2e0291eadb0d60c2cec183
+Harden XHS structured payload extraction
+```
+
+Known live state remains unchanged:
+
+```text
+12 notes successfully completed and exported
+candidate 13 detected RISK_CONTROL_DETECTED
+crawler safely stopped
+NO automatic retry was performed
+```
+
+Risk fixed:
+
+```text
+XHS comment objects may contain parent note_id / noteId.
+Therefore note_id, noteId, or id alone is not sufficient proof that a dict is itself a note object.
+```
+
+This round was offline only:
+
+```text
+NO LIVE XHS TEST THIS ROUND
+No --mode smoke / collect / login-only / navigation-probe was run.
+No browser was opened against a real XHS page.
+No cooldown, stealth, proxy, cookie import, direct URL, API replay, signature replay, or risk-control bypass was added.
+COMMENTS CONTENT = NOT IMPLEMENTED
+FULL 136 = NOT EXECUTED
+```
+
+Fixes made:
+
+```text
+- generic structured traversal now requires note_id/noteId/id plus strong note schema evidence.
+- content, time, create_time, likedCount, like_count, user, and nickname are not sufficient note evidence.
+- user/profile-shaped objects with id + desc are rejected unless they also have stronger note-only evidence.
+- INITIAL_STATE exact note.noteDetailMap[note_id].note remains high-confidence.
+- INITIAL_STATE fallback traversal now also requires note schema evidence and rejects comment.note_id references.
+- comment response paths are skipped in _capture_structured() using sanitized URL path only.
+- structured _field_sources now use canonical business keys: title, body, note_type, publish_time, like_count, collect_count, comment_count, share_count, tags.
+- merge_note_with_structured() now reads canonical provenance keys for final field_source_counts.
+- equal tags from a stronger source merge provenance deterministically instead of keeping only the weaker source.
+```
+
+Validation:
+
+```powershell
+$env:PLAYWRIGHT_BROWSERS_PATH="$PWD\.ms-playwright"
+$env:PYTHONIOENCODING="utf-8"
+.\.venv\Scripts\python.exe -m pytest tests\test_crawler_navigation.py tests\test_security_sanitization.py tests\test_extractors_dom.py -q
+```
+
+Result:
+
+```text
+76 passed in 32.08s
+```
+
+Full offline validation:
+
+```powershell
+$env:PLAYWRIGHT_BROWSERS_PATH="$PWD\.ms-playwright"
+$env:PYTHONIOENCODING="utf-8"
+.\.venv\Scripts\python.exe -m pytest -q
+git diff --check
+.\.venv\Scripts\python.exe -m xhs_profile_exporter --mode qa-only
+```
+
+Results:
+
+```text
+pytest: 112 passed in 38.90s
+git diff --check: passed, only Windows LF/CRLF warnings
+qa-only: passed=True
+```

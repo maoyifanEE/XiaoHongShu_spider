@@ -11,6 +11,7 @@ from xhs_profile_exporter.crawler import (
     determine_run_status,
     extract_public_note_records,
     extract_public_profile_record,
+    is_comment_response_path,
     merge_public_note_records,
     merge_public_profile_records,
     route_matches_note,
@@ -306,7 +307,7 @@ def test_later_partial_response_does_not_erase_existing_public_fields(tmp_path: 
     crawler2.current_run_id = "run"
     crawler2.current_creator_id = "5cfb1f8e00000000100322e4"
     crawler2._capture_structured("run", "https://www.xiaohongshu.com/api/a", {"noteId": note_id, "title": "标题"})
-    crawler2._capture_structured("run", "https://www.xiaohongshu.com/api/b", {"noteId": note_id, "likedCount": "9"})
+    crawler2._capture_structured("run", "https://www.xiaohongshu.com/api/b", {"noteId": note_id, "interactInfo": {"likedCount": "9"}})
     assert crawler2.structured_by_note[note_id]["title"] == "标题"
     assert crawler2.structured_by_note[note_id]["liked_count"] == "9"
 
@@ -353,6 +354,50 @@ def test_explicit_note_id_is_classified():
     note_id = "66dabcde000000001f01abcd"
     records = extract_public_note_records({"noteId": note_id, "title": "T"})
     assert records[note_id]["title"] == "T"
+
+
+def test_comment_with_parent_note_id_is_not_note():
+    note_id = "66dabcde000000001f01abcd"
+    comment_id = "bbbbbbbbbbbbbbbbbbbbbbbb"
+    records = extract_public_note_records(
+        {
+            "comments": [
+                {
+                    "id": comment_id,
+                    "note_id": note_id,
+                    "content": "这是一条评论",
+                    "create_time": 123456,
+                    "like_count": "568",
+                    "user": {"nickname": "u"},
+                }
+            ]
+        }
+    )
+    assert note_id not in records
+    assert comment_id not in records
+
+
+def test_comment_with_parent_noteId_is_not_note():
+    note_id = "66dabcde000000001f01abcd"
+    records = extract_public_note_records({"noteId": note_id, "content": "relationship object", "likedCount": "9"})
+    assert records == {}
+
+
+def test_explicit_note_id_without_note_schema_is_rejected():
+    note_id = "66dabcde000000001f01abcd"
+    assert extract_public_note_records({"note_id": note_id, "time": 123, "likedCount": "5"}) == {}
+
+
+def test_explicit_note_id_with_title_is_note():
+    note_id = "66dabcde000000001f01abcd"
+    records = extract_public_note_records({"note_id": note_id, "title": "标题"})
+    assert records[note_id]["title"] == "标题"
+
+
+def test_explicit_note_id_with_desc_is_note():
+    note_id = "66dabcde000000001f01abcd"
+    records = extract_public_note_records({"note_id": note_id, "desc": "正文"})
+    assert records[note_id]["desc"] == "正文"
 
 
 def test_generic_id_with_note_schema_is_classified():
@@ -469,7 +514,7 @@ def test_field_level_structured_provenance():
     )
     record = merge_public_note_records(record, {"note_id": note_id, "liked_count": "2"}, note_id, prefer_incoming=True, incoming_source="DETAIL_INITIAL_STATE")
     assert record["_field_sources"]["title"] == "PAGE_RESPONSE"
-    assert record["_field_sources"]["liked_count"] == "DETAIL_INITIAL_STATE"
+    assert record["_field_sources"]["like_count"] == "DETAIL_INITIAL_STATE"
     assert record["_field_sources"]["share_count"] == "PAGE_RESPONSE"
 
 
@@ -479,6 +524,72 @@ def test_tag_provenance_merges_deterministically():
     record = merge_public_note_records(record, {"note_id": note_id, "tags": ["B"]}, note_id, prefer_incoming=True, incoming_source="DETAIL_INITIAL_STATE")
     assert record["tags"] == ["A", "B"]
     assert record["_field_sources"]["tags"] == "PAGE_RESPONSE+DETAIL_INITIAL_STATE"
+
+
+def test_equal_tags_upgrade_or_merge_provenance():
+    note_id = "66dabcde000000001f01abcd"
+    record = merge_public_note_records(None, {"note_id": note_id, "tags": ["A"]}, note_id, prefer_incoming=False, incoming_source="PAGE_RESPONSE")
+    record = merge_public_note_records(record, {"note_id": note_id, "tags": ["A"]}, note_id, prefer_incoming=True, incoming_source="DETAIL_INITIAL_STATE")
+    assert record["tags"] == ["A"]
+    assert record["_field_sources"]["tags"] == "PAGE_RESPONSE+DETAIL_INITIAL_STATE"
+
+
+def test_canonical_field_provenance_for_content_body():
+    note_id = "66dabcde000000001f01abcd"
+    record = merge_public_note_records(None, {"note_id": note_id, "content": "正文"}, note_id, prefer_incoming=False, incoming_source="PAGE_RESPONSE")
+    assert record["_field_sources"]["body"] == "PAGE_RESPONSE"
+    assert "content" not in record["_field_sources"]
+
+
+def test_canonical_field_provenance_for_display_title():
+    note_id = "66dabcde000000001f01abcd"
+    record = merge_public_note_records(None, {"note_id": note_id, "display_title": "标题"}, note_id, prefer_incoming=False, incoming_source="PAGE_RESPONSE")
+    assert record["_field_sources"]["title"] == "PAGE_RESPONSE"
+    assert "display_title" not in record["_field_sources"]
+
+
+def test_canonical_field_provenance_for_type_alias():
+    note_id = "66dabcde000000001f01abcd"
+    record = merge_public_note_records(None, {"note_id": note_id, "model_type": "video"}, note_id, prefer_incoming=True, incoming_source="DETAIL_INITIAL_STATE")
+    assert record["_field_sources"]["note_type"] == "DETAIL_INITIAL_STATE"
+    assert "model_type" not in record["_field_sources"]
+
+
+def test_canonical_field_provenance_for_time_alias():
+    note_id = "66dabcde000000001f01abcd"
+    record = merge_public_note_records(None, {"note_id": note_id, "time": 1234567890}, note_id, prefer_incoming=False, incoming_source="PAGE_RESPONSE")
+    assert record["_field_sources"]["publish_time"] == "PAGE_RESPONSE"
+    assert "time" not in record["_field_sources"]
+
+
+def test_canonical_metric_provenance():
+    note_id = "66dabcde000000001f01abcd"
+    record = merge_public_note_records(
+        None,
+        {"note_id": note_id, "liked_count": "1", "collected_count": "2", "comment_count": "3", "share_count": "4"},
+        note_id,
+        prefer_incoming=False,
+        incoming_source="PAGE_RESPONSE",
+    )
+    assert record["_field_sources"]["like_count"] == "PAGE_RESPONSE"
+    assert record["_field_sources"]["collect_count"] == "PAGE_RESPONSE"
+    assert record["_field_sources"]["comment_count"] == "PAGE_RESPONSE"
+    assert record["_field_sources"]["share_count"] == "PAGE_RESPONSE"
+
+
+def test_comment_response_path_skips_structured_extraction(tmp_path: Path):
+    note_id = "66dabcde000000001f01abcd"
+    crawler = Crawler(app_config(tmp_path), DummyDb(), DummyLogger())
+    crawler.current_run_id = "run"
+    crawler.current_creator_id = "5cfb1f8e00000000100322e4"
+    crawler._capture_structured(
+        "run",
+        "https://edith.xiaohongshu.com/api/sns/web/v2/comment/page?xsec_token=SECRET",
+        {"noteId": note_id, "title": "should-skip"},
+    )
+    assert is_comment_response_path("https://edith.xiaohongshu.com/api/sns/web/v2/comment/sub/page?x=1")
+    assert crawler.structured_by_note == {}
+    assert crawler.structured_profile is None
 
 
 def _checkpoint(tmp_path: Path):
@@ -864,6 +975,74 @@ def test_extract_initial_state_note_record_uses_exact_note_detail_map(tmp_path: 
     assert record["share_count"] == "7"
     assert record["tags"] == ["旅行", "杭州"]
     assert "privatePayload" not in str(record)
+
+
+def test_initial_state_fallback_rejects_comment_note_reference(tmp_path: Path):
+    async def run():
+        note_id = "66dabcde000000001f01abcd"
+        crawler = Crawler(app_config(tmp_path), DummyDb(), DummyLogger())
+        async with async_playwright() as p:
+            browser = await p.chromium.launch(headless=True)
+            page = await browser.new_page()
+            await page.set_content("<html></html>")
+            await page.evaluate(
+                """
+                ([noteId]) => {
+                  window.__INITIAL_STATE__ = {
+                    comments: {
+                      items: [
+                        {
+                          id: "bbbbbbbbbbbbbbbbbbbbbbbb",
+                          note_id: noteId,
+                          content: "comment",
+                          like_count: "99"
+                        }
+                      ]
+                    }
+                  };
+                }
+                """,
+                [note_id],
+            )
+            record = await crawler._extract_initial_state_note_record(page, note_id)
+            await browser.close()
+            return record
+
+    assert asyncio.run(run()) is None
+
+
+def test_initial_state_fallback_accepts_real_note_schema(tmp_path: Path):
+    async def run():
+        note_id = "66dabcde000000001f01abcd"
+        crawler = Crawler(app_config(tmp_path), DummyDb(), DummyLogger())
+        async with async_playwright() as p:
+            browser = await p.chromium.launch(headless=True)
+            page = await browser.new_page()
+            await page.set_content("<html></html>")
+            await page.evaluate(
+                """
+                ([noteId]) => {
+                  window.__INITIAL_STATE__ = {
+                    someOtherPlace: {
+                      item: {
+                        noteId,
+                        title: "T",
+                        interactInfo: {likedCount: "10"}
+                      }
+                    }
+                  };
+                }
+                """,
+                [note_id],
+            )
+            record = await crawler._extract_initial_state_note_record(page, note_id)
+            await browser.close()
+            return record
+
+    record = asyncio.run(run())
+    assert record["note_id"] == "66dabcde000000001f01abcd"
+    assert record["title"] == "T"
+    assert record["liked_count"] == "10"
 
 
 def test_extract_initial_state_profile_record_uses_user_page_data(tmp_path: Path):

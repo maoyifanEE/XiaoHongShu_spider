@@ -740,6 +740,22 @@ class Crawler:
                   const exact = window.__INITIAL_STATE__?.note?.noteDetailMap?.[noteId]?.note;
                   const direct = normalize(exact);
                   if (direct) return direct;
+                  const hasNoteEvidence = (value) => Boolean(
+                    value &&
+                    typeof value === "object" &&
+                    (
+                      Object.prototype.hasOwnProperty.call(value, "interactInfo") ||
+                      Object.prototype.hasOwnProperty.call(value, "tagList") ||
+                      Object.prototype.hasOwnProperty.call(value, "displayTitle") ||
+                      Object.prototype.hasOwnProperty.call(value, "display_title") ||
+                      Object.prototype.hasOwnProperty.call(value, "title") ||
+                      Object.prototype.hasOwnProperty.call(value, "desc") ||
+                      Object.prototype.hasOwnProperty.call(value, "noteType") ||
+                      Object.prototype.hasOwnProperty.call(value, "note_type") ||
+                      Object.prototype.hasOwnProperty.call(value, "modelType") ||
+                      Object.prototype.hasOwnProperty.call(value, "model_type")
+                    )
+                  );
                   const walk = (root) => {
                     if (!root || typeof root !== "object") return null;
                     const seen = new Set();
@@ -750,7 +766,7 @@ class Crawler:
                       scanned += 1;
                       if (!value || typeof value !== "object" || seen.has(value)) continue;
                       seen.add(value);
-                      if (value.id === noteId || value.note_id === noteId || value.noteId === noteId) return normalize(value);
+                      if ((value.id === noteId || value.note_id === noteId || value.noteId === noteId) && hasNoteEvidence(value)) return normalize(value);
                       let children = [];
                       try { children = Object.values(value); } catch { children = []; }
                       for (const item of children) {
@@ -870,6 +886,9 @@ class Crawler:
     def _capture_structured(self, run_id: str, url: str, data: Any) -> None:
         if run_id != self.current_run_id:
             self.logger.info("STRUCTURED_RESPONSE ignored_stale run_id=%s current_run_id=%s", run_id, self.current_run_id)
+            return
+        if is_comment_response_path(url):
+            self.logger.info("STRUCTURED_RESPONSE skipped_comment_payload path=%s", urlsplit(url).path)
             return
         records, note_limit_reached = extract_public_note_records_with_stats(data)
         if note_limit_reached:
@@ -1066,15 +1085,64 @@ NOTE_PUBLIC_BUSINESS_KEYS = {
     "tags",
 }
 
+STRUCTURED_CANONICAL_FIELDS = {
+    "title",
+    "body",
+    "note_type",
+    "publish_time",
+    "like_count",
+    "collect_count",
+    "comment_count",
+    "share_count",
+    "tags",
+}
+
+STRUCTURED_FIELD_ALIASES = {
+    "title": "title",
+    "display_title": "title",
+    "desc": "body",
+    "content": "body",
+    "type": "note_type",
+    "note_type": "note_type",
+    "model_type": "note_type",
+    "time": "publish_time",
+    "publish_time": "publish_time",
+    "liked_count": "like_count",
+    "like_count": "like_count",
+    "collected_count": "collect_count",
+    "collect_count": "collect_count",
+    "comment_count": "comment_count",
+    "share_count": "share_count",
+    "tags": "tags",
+}
+
 NOTE_SCHEMA_EVIDENCE_KEYS = {
     "interactInfo",
     "tagList",
     "displayTitle",
     "display_title",
+    "title",
+    "desc",
     "noteType",
     "note_type",
     "modelType",
     "model_type",
+}
+
+NOTE_SCHEMA_NON_PROFILE_EVIDENCE_KEYS = NOTE_SCHEMA_EVIDENCE_KEYS - {"desc"}
+
+PROFILE_SCHEMA_EVIDENCE_KEYS = {
+    "nickname",
+    "name",
+    "user_id",
+    "userId",
+    "red_id",
+    "redId",
+    "xhs_id",
+    "fans",
+    "followers",
+    "follows",
+    "following",
 }
 
 PROFILE_PUBLIC_RECORD_KEYS = {
@@ -1135,14 +1203,14 @@ def merge_public_note_records(
         if key == "tags":
             before = merged.get("tags") or []
             merged["tags"] = merge_tags(merged.get("tags") or [], value or [])
-            if merged.get("tags") != before:
+            if field_value_present(value):
                 field_sources["tags"] = _merge_source_labels(field_sources.get("tags"), incoming_source)
             continue
         if not field_value_present(value):
             continue
         if not field_value_present(merged.get(key)) or incoming_can_replace_conflicts:
             merged[key] = value
-            field_sources[key] = incoming_source
+            field_sources[STRUCTURED_FIELD_ALIASES.get(key, key)] = incoming_source
     merged = normalize_public_note_record(merged, note_id) or {"note_id": note_id}
     merged["_structured_source"] = _merged_structured_source(existing_source, incoming_source, prefer_incoming)
     merged["_field_sources"] = _normalize_structured_field_sources(field_sources)
@@ -1209,7 +1277,11 @@ def _merged_structured_source(existing_source: Any, incoming_source: str, prefer
 
 
 def _field_sources_for_record(record: dict[str, Any], source: str) -> dict[str, str]:
-    return {key: source for key in NOTE_PUBLIC_BUSINESS_KEYS if field_value_present(record.get(key))}
+    return {
+        canonical: source
+        for key, canonical in STRUCTURED_FIELD_ALIASES.items()
+        if field_value_present(record.get(key))
+    }
 
 
 def _normalize_structured_field_sources(value: Any) -> dict[str, str]:
@@ -1217,9 +1289,10 @@ def _normalize_structured_field_sources(value: Any) -> dict[str, str]:
         return {}
     result = {}
     for key, source in value.items():
-        if key not in NOTE_PUBLIC_BUSINESS_KEYS:
+        canonical = STRUCTURED_FIELD_ALIASES.get(str(key))
+        if canonical not in STRUCTURED_CANONICAL_FIELDS:
             continue
-        result[key] = _normalize_source_label(source)
+        result[canonical] = _merge_source_labels(result.get(canonical), _normalize_source_label(source))
     return result
 
 
@@ -1235,7 +1308,7 @@ def _merge_source_labels(existing: Any, incoming: str) -> str:
 
 
 def _public_note_completeness_score(record: dict[str, Any]) -> int:
-    return sum(1 for key in NOTE_PUBLIC_BUSINESS_KEYS if field_value_present(record.get(key)))
+    return len(_field_sources_for_record(record, "PAGE_RESPONSE"))
 
 
 def _public_profile_completeness_score(record: dict[str, Any]) -> int:
@@ -1286,6 +1359,12 @@ def safe_route_summary(url: str) -> str:
         }
     )
     return parts.path + (f"?keys={','.join(keys)}" if keys else "")
+
+
+def is_comment_response_path(url: str) -> bool:
+    path = urlsplit(url).path.lower()
+    segments = [segment for segment in path.split("/") if segment]
+    return "comment" in segments or path.endswith("/comment/page") or path.endswith("/comment/sub/page")
 
 
 NOTE_PUBLIC_ALLOWLIST = {
@@ -1362,12 +1441,12 @@ def _bounded_walk(value: Any):
 
 
 def _note_candidate_id(value: dict[str, Any]) -> str | None:
-    explicit_id = value.get("note_id") or value.get("noteId")
-    if _is_valid_public_id(explicit_id):
-        return str(explicit_id)
-    generic_id = value.get("id")
-    if _is_valid_public_id(generic_id) and _has_note_schema_evidence(value):
-        return str(generic_id)
+    if not _has_note_schema_evidence(value):
+        return None
+    for key in ("note_id", "noteId", "id"):
+        candidate_id = value.get(key)
+        if _is_valid_public_id(candidate_id):
+            return str(candidate_id)
     return None
 
 
@@ -1376,7 +1455,12 @@ def _is_valid_public_id(value: Any) -> bool:
 
 
 def _has_note_schema_evidence(value: dict[str, Any]) -> bool:
-    return any(key in value for key in NOTE_SCHEMA_EVIDENCE_KEYS)
+    has_note_evidence = any(key in value for key in NOTE_SCHEMA_EVIDENCE_KEYS)
+    if not has_note_evidence:
+        return False
+    has_profile_evidence = any(key in value for key in PROFILE_SCHEMA_EVIDENCE_KEYS)
+    has_non_profile_note_evidence = any(key in value for key in NOTE_SCHEMA_NON_PROFILE_EVIDENCE_KEYS)
+    return not has_profile_evidence or has_non_profile_note_evidence
 
 
 def _normalize_public_profile_candidate(value: dict[str, Any], creator_id: str) -> dict[str, Any] | None:

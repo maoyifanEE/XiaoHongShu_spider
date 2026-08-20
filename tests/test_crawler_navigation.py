@@ -9,9 +9,12 @@ from xhs_profile_exporter.config import AppConfig, CreatorConfig
 from xhs_profile_exporter.crawler import (
     Crawler,
     determine_run_status,
+    merge_public_note_records,
+    merge_public_profile_records,
     route_matches_note,
     safe_route_summary,
     select_visible_note_cover_candidate,
+    summarize_profile_fields,
 )
 from xhs_profile_exporter.runtime import CollectionResult, OpenNoteResult, SafeStopRequested
 from xhs_profile_exporter.state import LoginStatus, RunStatus
@@ -218,6 +221,130 @@ def test_historical_db_does_not_make_zero_exportable_run_success(tmp_path: Path,
     assert result["status"] == RunStatus.PARTIAL_SUCCESS_SAFE_STOP.value
     assert result["notes_exportable"] == 0
     assert result["database_total_exportable"] == 10
+
+
+def test_multi_creator_structured_state_isolation(tmp_path: Path, monkeypatch):
+    db = DummyDb()
+    crawler = Crawler(app_config(tmp_path), db, DummyLogger())
+    creator_b = CreatorConfig(
+        name="creator_b",
+        url="https://www.xiaohongshu.com/user/profile/aaaaaaaaaaaaaaaaaaaaaaaa",
+        enabled=True,
+        user_id="aaaaaaaaaaaaaaaaaaaaaaaa",
+    )
+    crawler.structured_profile = {"user_id": "5cfb1f8e00000000100322e4", "nickname": "creator_a"}
+    crawler.structured_by_note = {"66dabcde000000001f01abcd": {"note_id": "66dabcde000000001f01abcd", "title": "a"}}
+
+    async def fake_profile(*args, **kwargs):
+        assert crawler.structured_profile is None
+        assert crawler.structured_by_note == {}
+        return {"captured_at": "now", "nickname": "creator_b", "canonical_url": creator_b.url, "source": "test"}
+
+    async def fake_discover(*args, **kwargs):
+        raise SafeStopRequested(LoginStatus.RISK_CONTROL_DETECTED, "RISK_CONTROL_DETECTED", "discovery")
+
+    monkeypatch.setattr(crawler_module, "BrowserSession", FakeBrowserSession)
+    monkeypatch.setattr(crawler_module, "extract_profile_dom", fake_profile)
+    monkeypatch.setattr(crawler, "_extract_initial_state_profile_record", lambda *args, **kwargs: _return_async(None))
+    monkeypatch.setattr(crawler, "_discover_notes", fake_discover)
+
+    result = asyncio.run(crawler._run_creator(creator_b, "collect"))
+    assert result["status"] == RunStatus.PARTIAL_SUCCESS_SAFE_STOP.value
+    assert crawler.current_creator_id == creator_b.user_id
+    assert "66dabcde000000001f01abcd" not in crawler.structured_by_note
+
+
+def test_exact_detail_state_overrides_weaker_response_record():
+    note_id = "66dabcde000000001f01abcd"
+    existing = {
+        "note_id": note_id,
+        "title": "weak title",
+        "liked_count": "1",
+        "tags": ["列表"],
+    }
+    incoming = {
+        "note_id": note_id,
+        "title": "exact title",
+        "liked_count": "12",
+        "share_count": "3",
+        "tags": ["详情"],
+    }
+    merged = merge_public_note_records(existing, incoming, note_id, prefer_incoming=True, incoming_source="DETAIL_INITIAL_STATE")
+    assert merged["title"] == "exact title"
+    assert merged["liked_count"] == "12"
+    assert merged["share_count"] == "3"
+    assert merged["tags"] == ["列表", "详情"]
+    assert merged["_structured_source"] == "DETAIL_INITIAL_STATE"
+
+
+def test_later_partial_response_does_not_erase_existing_public_fields(tmp_path: Path):
+    note_id = "66dabcde000000001f01abcd"
+    crawler = Crawler(app_config(tmp_path), DummyDb(), DummyLogger())
+    crawler.current_run_id = "run"
+    crawler.current_creator_id = "5cfb1f8e00000000100322e4"
+    crawler._capture_structured(
+        "run",
+        "https://www.xiaohongshu.com/api/sns/web/v1/feed",
+        {"id": note_id, "title": "完整", "interactInfo": {"likedCount": "11", "shareCount": "2"}, "tagList": [{"name": "A"}]},
+    )
+    crawler._capture_structured(
+        "run",
+        "https://www.xiaohongshu.com/api/sns/web/v1/search",
+        {"id": note_id, "title": "标题-only"},
+    )
+    record = crawler.structured_by_note[note_id]
+    assert record["title"] == "完整"
+    assert record["liked_count"] == "11"
+    assert record["share_count"] == "2"
+    assert record["tags"] == ["A"]
+
+    crawler2 = Crawler(app_config(tmp_path), DummyDb(), DummyLogger())
+    crawler2.current_run_id = "run"
+    crawler2.current_creator_id = "5cfb1f8e00000000100322e4"
+    crawler2._capture_structured("run", "https://www.xiaohongshu.com/api/a", {"id": note_id, "title": "标题"})
+    crawler2._capture_structured("run", "https://www.xiaohongshu.com/api/b", {"id": note_id, "likedCount": "9"})
+    assert crawler2.structured_by_note[note_id]["title"] == "标题"
+    assert crawler2.structured_by_note[note_id]["liked_count"] == "9"
+
+
+def test_profile_partial_response_does_not_erase_existing_fields():
+    creator_id = "5cfb1f8e00000000100322e4"
+    merged = merge_public_profile_records(
+        {"user_id": creator_id, "nickname": "昵称", "followers": "1.2万", "bio": "公开简介", "ip_location": "浙江", "avatar_url": "https://img.example/a.jpg"},
+        {"user_id": creator_id, "nickname": "新昵称"},
+        creator_id,
+        prefer_incoming=False,
+    )
+    assert merged["nickname"] == "昵称"
+    assert merged["followers"] == "1.2万"
+    assert merged["bio"] == "公开简介"
+    assert merged["ip_location"] == "浙江"
+    assert merged["avatar_url"] == "https://img.example/a.jpg"
+
+
+def test_different_creator_profile_records_never_merge():
+    creator_id = "5cfb1f8e00000000100322e4"
+    merged = merge_public_profile_records(
+        {"user_id": creator_id, "nickname": "A", "followers": "10"},
+        {"user_id": "aaaaaaaaaaaaaaaaaaaaaaaa", "nickname": "B", "followers": "99"},
+        creator_id,
+        prefer_incoming=True,
+    )
+    assert merged == {"user_id": creator_id, "nickname": "A", "followers": "10"}
+
+
+def test_missing_profile_field_reason_is_not_observed():
+    summary = summarize_profile_fields(
+        {
+            "nickname": "昵称",
+            "canonical_url": "https://www.xiaohongshu.com/user/profile/5cfb1f8e00000000100322e4",
+            "field_sources": {"nickname": "DOM"},
+        },
+        {"user_id": "5cfb1f8e00000000100322e4", "nickname": "昵称"},
+    )
+    assert summary["following"]["present"] is False
+    assert summary["following"]["reason"] == "NOT_OBSERVED"
+    assert summary["profile_tags"]["reason"] == "NOT_OBSERVED"
 
 
 def _checkpoint(tmp_path: Path):
@@ -466,6 +593,66 @@ def test_collect_safe_stop_returns_partial_stats(tmp_path: Path, monkeypatch):
     assert result.safe_stop_status == LoginStatus.RISK_CONTROL_DETECTED
     assert result.exportable_ids == [cards[0]["note_id"]]
     assert result.attempted_ids == [cards[0]["note_id"]]
+
+
+def test_risk_checkpoint_preserves_completed_and_pending_note(tmp_path: Path, monkeypatch):
+    db = DummyDb()
+    crawler = Crawler(app_config(tmp_path), db, DummyLogger())
+    page = FakePage()
+    creator = app_config(tmp_path).creators[0]
+    completed_note = "66dabcde000000001f01abcd"
+    risk_note = "aaaaaaaaaaaaaaaaaaaaaaaa"
+    cards = [{"note_id": completed_note}, {"note_id": risk_note}]
+    opened = []
+
+    async def fake_open(page, profile_url, card, budget):
+        opened.append(card["note_id"])
+        if card["note_id"] == risk_note:
+            raise SafeStopRequested(LoginStatus.RISK_CONTROL_DETECTED, "RISK_CONTROL_DETECTED", "note_after_open", risk_note)
+        return OpenNoteResult(page=page, note_id=card["note_id"], strategy="test", target_verified=True)
+
+    async def fake_extract(page, note_id, top_n):
+        return {"note_id": note_id, "status": "OK", "title": "ok", "top_comments": [], "raw_json": {}}
+
+    monkeypatch.setattr(crawler, "_open_note_from_profile", fake_open)
+    monkeypatch.setattr(crawler, "_extract_initial_state_note_record", lambda *args, **kwargs: _return_async(None))
+    monkeypatch.setattr(crawler_module, "extract_note_dom", fake_extract)
+    monkeypatch.setattr(crawler, "_return_to_creator_profile", lambda *args, **kwargs: _return_async({"strategy": "ok", "profile_restored": True, "route_after": "/user/profile/x"}))
+    monkeypatch.setattr(crawler_module, "browser_flush_if_available", lambda *args, **kwargs: _noop_async())
+
+    checkpoint = _checkpoint(tmp_path)
+    result = asyncio.run(crawler._collect_notes(page, creator, cards, checkpoint, crawler._build_budget()))
+    assert result.safe_stop_reason == "RISK_CONTROL_DETECTED"
+    assert checkpoint.completed_note_ids == [completed_note]
+    assert checkpoint.current_note_id == risk_note
+    assert risk_note not in checkpoint.completed_note_ids
+    assert opened == [completed_note, risk_note]
+
+
+def test_risk_safe_stop_never_auto_retries(tmp_path: Path, monkeypatch):
+    db = DummyDb()
+    crawler = Crawler(app_config(tmp_path), db, DummyLogger())
+    page = FakePage()
+    risk_note = "66dabcde000000001f01abcd"
+    attempts = 0
+
+    async def fake_open(page, profile_url, card, budget):
+        nonlocal attempts
+        attempts += 1
+        raise SafeStopRequested(LoginStatus.RISK_CONTROL_DETECTED, "RISK_CONTROL_DETECTED", "note_after_open", risk_note)
+
+    monkeypatch.setattr(crawler, "_open_note_from_profile", fake_open)
+    result = asyncio.run(
+        crawler._collect_notes(
+            page,
+            app_config(tmp_path).creators[0],
+            [{"note_id": risk_note}],
+            _checkpoint(tmp_path),
+            crawler._build_budget(),
+        )
+    )
+    assert result.safe_stop_reason == "RISK_CONTROL_DETECTED"
+    assert attempts == 1
 
 
 def test_extract_initial_state_note_record_uses_exact_note_detail_map(tmp_path: Path):

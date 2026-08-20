@@ -1081,7 +1081,7 @@ Profile:
 - added exact userPageData extraction from window.__INITIAL_STATE__.user.userPageData.
 - extract_public_profile_record() now supports userId/ipLocation/follows/fans/interaction/gender/tags aliases.
 - merge_profile_with_structured() fills missing formal profile fields only; it does not overwrite reliable DOM values.
-- profile completeness now includes missing reason: PAGE_NOT_PUBLIC or UNKNOWN.
+- profile completeness now includes a missing reason. Later review corrected over-specific missing fields to NOT_OBSERVED unless there is explicit evidence.
 
 Safe-stop stats:
 - collect-time SafeStopRequested now returns a partial CollectionResult so DB/CLI/log retain attempted/verified/exportable/field stats.
@@ -1213,15 +1213,17 @@ nickname=present DOM
 user_id=present DOM
 description=present DOM
 followers=present DOM
-following=missing PAGE_NOT_PUBLIC
+following=missing NOT_OBSERVED
 likes_interaction=present DOM
 xhs_id=present DOM
 avatar_url=present DOM
 ip_location=present DOM
-profile_tags=missing PAGE_NOT_PUBLIC
-identity_tags=missing PAGE_NOT_PUBLIC
-gender=missing PAGE_NOT_PUBLIC
+profile_tags=missing NOT_OBSERVED
+identity_tags=missing NOT_OBSERVED
+gender=missing NOT_OBSERVED
 ```
+
+Later offline review corrected the missing reason semantics: these missing fields were not observed in the DOM/allowlisted state during that run, but that is not proof that the page explicitly does not publish them.
 
 Security scan:
 
@@ -1238,7 +1240,65 @@ Remaining limitations:
 Endurance did not complete 20/20 because the platform showed RISK_CONTROL_DETECTED at candidate 13.
 The crawler stopped safely and did not retry, bypass, proxy, or use direct/API/token methods.
 comment_count/share_count/tags remain NULL when neither verified detail DOM nor exact INITIAL_STATE exposes the field.
-following/profile_tags/identity_tags/gender remained PAGE_NOT_PUBLIC in the observed profile page/state.
+following/profile_tags/identity_tags/gender were NOT_OBSERVED in the observed profile page/state; this should not be treated as proven PAGE_NOT_PUBLIC.
 COMMENTS = NOT IMPLEMENTED
 FULL 136 = NOT EXECUTED
+```
+
+## Post-Risk Offline Reliability Review - 2026-08-20
+
+Baseline:
+
+```text
+d1a70b8fa696b1e8d7c83e9d6b956c5e9c3aaa4d
+Improve XHS public field extraction
+```
+
+Known live facts from the previous round:
+
+```text
+20-note endurance requested
+12 notes successfully completed and exported
+candidate 13 detected RISK_CONTROL_DETECTED
+safe stop worked
+NO automatic retry was performed
+```
+
+This round was offline only:
+
+```text
+NO LIVE XHS TEST THIS ROUND
+No --mode smoke / collect / login-only / navigation-probe was run.
+No browser was opened against a real XHS page.
+No cooldown, stealth, proxy, cookie import, direct URL, API replay, or risk-control bypass was added.
+COMMENTS = NOT IMPLEMENTED
+FULL 136 = NOT EXECUTED
+```
+
+Fixes made:
+
+```text
+- _run_creator() now resets transient structured_by_note and structured_profile for each creator/run.
+- stale structured response callbacks are ignored when run_id no longer matches current_run_id.
+- structured note records now merge non-destructively through public allowlisted fields.
+- exact verified detail INITIAL_STATE can fill/override weaker page-response records without letting empty fields erase valid values.
+- generic page responses only fill missing note fields and cannot downgrade richer existing records.
+- structured profile records now merge non-destructively for the same creator_id only.
+- profile missing field reason is now NOT_OBSERVED unless future code has explicit absence evidence.
+- risk-control checkpoint regression tests verify completed notes remain completed and the triggering candidate is not marked complete.
+- risk-control safe stop is covered by a no-auto-retry unit test.
+```
+
+Validation:
+
+```powershell
+$env:PLAYWRIGHT_BROWSERS_PATH="$PWD\.ms-playwright"
+$env:PYTHONIOENCODING="utf-8"
+.\.venv\Scripts\python.exe -m pytest tests\test_crawler_navigation.py tests\test_checkpoint_resume.py tests\test_extractors_dom.py -q
+```
+
+Result:
+
+```text
+43 passed in 32.62s
 ```

@@ -58,6 +58,9 @@ class Crawler:
         run_id = f"{now_iso().replace(':', '').replace('+', '_')}_{uuid.uuid4().hex[:8]}"
         self.current_run_id = run_id
         self.current_creator_id = user_id
+        self.structured_by_note = {}
+        self.structured_profile = None
+        self.logger.info("STRUCTURED_STATE reset run_id=%s creator_id=%s", run_id, user_id)
         self.db.start_run(run_id, user_id, creator.name, self.app_config.version)
         checkpoint = Checkpoint(run_id=run_id, creator_id=user_id)
         resume_checkpoint = None
@@ -101,7 +104,12 @@ class Crawler:
                 profile = await extract_profile_dom(page, creator.url, creator.name)
                 profile_state_record = await self._extract_initial_state_profile_record(page, user_id)
                 if profile_state_record:
-                    self.structured_profile = {**profile_state_record, **(self.structured_profile or {})}
+                    self.structured_profile = merge_public_profile_records(
+                        self.structured_profile,
+                        profile_state_record,
+                        user_id,
+                        prefer_incoming=True,
+                    )
                 if self.structured_profile:
                     profile = merge_profile_with_structured(profile, self.structured_profile)
                     profile["raw_json"] = {**(profile.get("raw_json") or {}), "structured": self.structured_profile}
@@ -325,7 +333,13 @@ class Crawler:
                 await browser_flush_if_available(page)
                 initial_state_record = await self._extract_initial_state_note_record(page, note_id)
                 if initial_state_record:
-                    self.structured_by_note[note_id] = {**initial_state_record, **self.structured_by_note.get(note_id, {})}
+                    self.structured_by_note[note_id] = merge_public_note_records(
+                        self.structured_by_note.get(note_id),
+                        initial_state_record,
+                        note_id,
+                        prefer_incoming=True,
+                        incoming_source="DETAIL_INITIAL_STATE",
+                    )
                 note = await extract_note_dom(page, note_id, top_n)
                 if note.get("status") != "OK":
                     self.logger.info("NOTE non_ok note_id=%s status=%s reason=%s", note_id, note.get("status"), note.get("status_note"))
@@ -843,13 +857,27 @@ class Crawler:
             raise SafeStopRequested(status, "RISK_CONTROL_DETECTED", phase, note_id)
 
     def _capture_structured(self, run_id: str, url: str, data: Any) -> None:
+        if run_id != self.current_run_id:
+            self.logger.info("STRUCTURED_RESPONSE ignored_stale run_id=%s current_run_id=%s", run_id, self.current_run_id)
+            return
         records = extract_public_note_records(data)
         for note_id, record in records.items():
-            self.structured_by_note[note_id] = record
+            self.structured_by_note[note_id] = merge_public_note_records(
+                self.structured_by_note.get(note_id),
+                record,
+                note_id,
+                prefer_incoming=False,
+                incoming_source="PAGE_RESPONSE",
+            )
         profile_before = self.structured_profile is not None
         profile_record = extract_public_profile_record(data, self.current_creator_id) if self.current_creator_id else None
         if profile_record:
-            self.structured_profile = profile_record
+            self.structured_profile = merge_public_profile_records(
+                self.structured_profile,
+                profile_record,
+                self.current_creator_id,
+                prefer_incoming=False,
+            )
         if records or (self.structured_profile is not None and not profile_before):
             self.logger.info("STRUCTURED_RESPONSE run_id=%s extracted_note_records=%s profile_associated=%s", run_id, len(records), bool(self.structured_profile))
 
@@ -962,7 +990,7 @@ def summarize_profile_fields(profile: dict[str, Any], structured: dict[str, Any]
         summary[field] = {
             "present": present,
             "source": sources.get(field) or ("DOM" if present else "MISSING"),
-            "reason": None if present else ("PAGE_NOT_PUBLIC" if structured is not None else "UNKNOWN"),
+            "reason": None if present else "NOT_OBSERVED",
         }
     return summary
 
@@ -975,6 +1003,135 @@ def field_value_present(value: Any) -> bool:
     if isinstance(value, (list, tuple, set, dict)):
         return bool(value)
     return True
+
+
+NOTE_PUBLIC_RECORD_KEYS = {
+    "id",
+    "note_id",
+    "title",
+    "display_title",
+    "desc",
+    "content",
+    "type",
+    "note_type",
+    "model_type",
+    "time",
+    "publish_time",
+    "liked_count",
+    "collected_count",
+    "comment_count",
+    "share_count",
+    "tags",
+    "_structured_source",
+}
+
+PROFILE_PUBLIC_RECORD_KEYS = {
+    "user_id",
+    "nickname",
+    "xhs_id",
+    "bio",
+    "avatar_url",
+    "ip_location",
+    "followers",
+    "following",
+    "interactions",
+    "gender",
+    "tags",
+}
+
+
+def merge_public_note_records(
+    existing: dict[str, Any] | None,
+    incoming: dict[str, Any] | None,
+    note_id: str,
+    *,
+    prefer_incoming: bool,
+    incoming_source: str,
+) -> dict[str, Any]:
+    """Merge allowlisted transient note state without letting sparse records erase richer ones."""
+    normalized_existing = normalize_public_note_record(existing or {}, note_id) if existing else None
+    normalized_incoming = normalize_public_note_record(incoming or {}, note_id) if incoming else None
+    existing_source = (existing or {}).get("_structured_source")
+    if not normalized_existing and not normalized_incoming:
+        return {"note_id": note_id, "_structured_source": incoming_source}
+    if not normalized_existing:
+        merged = _allowlisted_note_record(normalized_incoming or {"note_id": note_id})
+        merged["_structured_source"] = incoming_source
+        return merged
+    if not normalized_incoming:
+        merged = _allowlisted_note_record(normalized_existing)
+        if existing_source:
+            merged["_structured_source"] = existing_source
+        return merged
+
+    if normalized_incoming.get("note_id") != normalized_existing.get("note_id"):
+        raise ValueError(f"structured note_id mismatch: {normalized_existing.get('note_id')} != {normalized_incoming.get('note_id')}")
+
+    merged = _allowlisted_note_record(normalized_existing)
+    for key, value in _allowlisted_note_record(normalized_incoming).items():
+        if key in {"id", "note_id", "_structured_source"}:
+            continue
+        if key == "tags":
+            merged["tags"] = merge_tags(merged.get("tags") or [], value or [])
+            continue
+        if not field_value_present(value):
+            continue
+        if prefer_incoming or not field_value_present(merged.get(key)):
+            merged[key] = value
+    merged = normalize_public_note_record(merged, note_id) or {"note_id": note_id}
+    merged["_structured_source"] = _merged_structured_source(existing_source, incoming_source, prefer_incoming)
+    return _allowlisted_note_record(merged)
+
+
+def merge_public_profile_records(
+    existing: dict[str, Any] | None,
+    incoming: dict[str, Any] | None,
+    creator_id: str,
+    *,
+    prefer_incoming: bool,
+) -> dict[str, Any] | None:
+    """Merge public profile fields for one creator without preserving cross-creator data."""
+    normalized_incoming = _allowlisted_profile_record(incoming, creator_id)
+    if not normalized_incoming:
+        return _allowlisted_profile_record(existing, creator_id)
+    normalized_existing = _allowlisted_profile_record(existing, creator_id)
+    if not normalized_existing:
+        return normalized_incoming
+    if normalized_existing.get("user_id") != normalized_incoming.get("user_id"):
+        return normalized_existing
+
+    merged = dict(normalized_existing)
+    for key, value in normalized_incoming.items():
+        if key == "user_id":
+            continue
+        if key == "tags":
+            merged["tags"] = merge_tags(merged.get("tags") or [], value or [])
+            continue
+        if not field_value_present(value):
+            continue
+        if prefer_incoming or not field_value_present(merged.get(key)):
+            merged[key] = value
+    return _allowlisted_profile_record(merged, creator_id)
+
+
+def _allowlisted_note_record(record: dict[str, Any]) -> dict[str, Any]:
+    return {key: value for key, value in record.items() if key in NOTE_PUBLIC_RECORD_KEYS and field_value_present(value)}
+
+
+def _allowlisted_profile_record(record: dict[str, Any] | None, creator_id: str) -> dict[str, Any] | None:
+    if not record or record.get("user_id") != creator_id:
+        return None
+    allowed = {key: value for key, value in record.items() if key in PROFILE_PUBLIC_RECORD_KEYS and field_value_present(value)}
+    allowed["user_id"] = creator_id
+    return allowed
+
+
+def _merged_structured_source(existing_source: Any, incoming_source: str, prefer_incoming: bool) -> str:
+    if prefer_incoming:
+        return incoming_source
+    if existing_source == "DETAIL_INITIAL_STATE":
+        return "DETAIL_INITIAL_STATE"
+    return incoming_source if not existing_source else str(existing_source)
 
 
 def is_visible_note_cover_summary(summary: dict[str, Any]) -> bool:

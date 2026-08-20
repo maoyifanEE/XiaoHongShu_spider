@@ -76,6 +76,8 @@ class CollectionResult:
     attempted_ids: list[str] = field(default_factory=list)
     exportable_ids: list[str] = field(default_factory=list)
     non_exportable_ids: list[str] = field(default_factory=list)
+    navigation_failed_ids: list[str] = field(default_factory=list)
+    non_public_ids: list[str] = field(default_factory=list)
     failed_ids: list[str] = field(default_factory=list)
     safe_stop_status: LoginStatus | None = None
     safe_stop_reason: str | None = None
@@ -83,6 +85,10 @@ class CollectionResult:
     @property
     def attempted_count(self) -> int:
         return len(self.attempted_ids)
+
+    @property
+    def unresolved_count(self) -> int:
+        return len(self.navigation_failed_ids) + len(self.failed_ids)
 
 
 class RunBudget:

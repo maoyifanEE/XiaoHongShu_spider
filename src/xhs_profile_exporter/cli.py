@@ -76,10 +76,19 @@ def main(argv: list[str] | None = None) -> int:
         crawler = Crawler(config, db, logger)
         result = asyncio.run(crawler.run(args.mode, args.creator, args.max_notes, resume=args.resume))
         print(json.dumps(result, ensure_ascii=False, indent=2))
-        return 0
+        return exit_code_for_results(args.mode, result)
     finally:
         db.close()
         logger.info("EXIT")
+
+
+def exit_code_for_results(mode: str, result: dict) -> int:
+    values = list(result.values()) if result and all(isinstance(item, dict) for item in result.values()) else [result]
+    if mode == "login-only":
+        return 0 if all(item.get("status") == "LOGIN_OK" for item in values) else 2
+    if mode in {"collect", "smoke"}:
+        return 0 if all(item.get("status") == "SUCCESS" for item in values) else 2
+    return 0
 
 
 if __name__ == "__main__":

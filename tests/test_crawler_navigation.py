@@ -7,6 +7,7 @@ import xhs_profile_exporter.crawler as crawler_module
 from xhs_profile_exporter.config import AppConfig, CreatorConfig
 from xhs_profile_exporter.crawler import (
     Crawler,
+    determine_run_status,
     route_matches_note,
     safe_route_summary,
     select_visible_note_cover_candidate,
@@ -147,8 +148,49 @@ def test_target_not_verified_does_not_parse_or_upsert(tmp_path: Path, monkeypatc
             budget=crawler._build_budget(),
         )
     )
-    assert result.non_exportable_ids == ["66dabcde000000001f01abcd"]
+    assert result.navigation_failed_ids == ["66dabcde000000001f01abcd"]
     assert db.saved_notes == []
+
+
+def test_cover_not_found_does_not_goto_access_or_canonical_url(tmp_path: Path, monkeypatch):
+    crawler = Crawler(app_config(tmp_path), DummyDb(), DummyLogger())
+    visited = []
+
+    class NavPage(FakePage):
+        url = "https://www.xiaohongshu.com/user/profile/5cfb1f8e00000000100322e4"
+
+        async def goto(self, url, wait_until=None):
+            visited.append(url)
+            self.url = url
+
+        def locator(self, selector):
+            return BodyLocator("")
+
+    class BodyLocator:
+        async def inner_text(self, timeout=0):
+            return ""
+
+    async def no_current_cover(*args, **kwargs):
+        return OpenNoteResult(page=args[0], note_id="66dabcde000000001f01abcd", strategy="current_mounted_cover_click", target_verified=False, reason="VISIBLE_COVER_NOT_FOUND")
+
+    async def no_scan_cover(*args, **kwargs):
+        return {"locator": None, "rounds": 1, "cover_candidates": 0}
+
+    async def no_safe_stop(*args, **kwargs):
+        return None
+
+    monkeypatch.setattr(crawler, "_click_visible_note_cover_on_current_page", no_current_cover)
+    monkeypatch.setattr(crawler, "_scan_profile_for_visible_note_cover", no_scan_cover)
+    monkeypatch.setattr(crawler, "_raise_if_safe_stop", no_safe_stop)
+    card = {
+        "note_id": "66dabcde000000001f01abcd",
+        "access_url": "https://www.xiaohongshu.com/explore/66dabcde000000001f01abcd?xsec_token=SECRET",
+        "canonical_url": "https://www.xiaohongshu.com/explore/66dabcde000000001f01abcd",
+    }
+    result = asyncio.run(crawler._open_note_from_profile(NavPage(), app_config(tmp_path).creators[0].url, card, crawler._build_budget()))
+    assert result.target_verified is False
+    assert visited == [app_config(tmp_path).creators[0].url]
+    assert all("/explore/" not in url for url in visited)
 
 
 def test_historical_db_does_not_make_zero_exportable_run_success(tmp_path: Path, monkeypatch):
@@ -286,7 +328,7 @@ def test_target_detail_gate_requires_exact_route_and_detail_root(tmp_path: Path,
         return None
 
     monkeypatch.setattr(crawler, "_raise_if_safe_stop", no_safe_stop)
-    monkeypatch.setattr(crawler, "_visible_detail_root_count", lambda page: _return_async(1))
+    monkeypatch.setattr(crawler, "_get_note_detail_evidence", lambda page, note_id: _return_async({"verified": True, "detail_root_count": 1}))
     verified, reason, detail_count = asyncio.run(crawler._wait_for_target_note_detail(DetailPage(f"https://www.xiaohongshu.com/explore/{note_id}"), note_id, timeout_ms=100))
     assert verified is True
     assert reason is None
@@ -295,6 +337,100 @@ def test_target_detail_gate_requires_exact_route_and_detail_root(tmp_path: Path,
     verified, reason, _ = asyncio.run(crawler._wait_for_target_note_detail(DetailPage("https://www.xiaohongshu.com/explore/aaaaaaaaaaaaaaaaaaaaaaaa"), note_id, timeout_ms=100))
     assert verified is False
     assert reason == "TARGET_MISMATCH"
+
+
+def test_generic_main_only_is_not_verified(tmp_path: Path, monkeypatch):
+    crawler = Crawler(app_config(tmp_path), DummyDb(), DummyLogger())
+    note_id = "66dabcde000000001f01abcd"
+
+    class DetailPage:
+        url = f"https://www.xiaohongshu.com/explore/{note_id}"
+
+        async def wait_for_timeout(self, timeout):
+            pass
+
+    async def no_safe_stop(*args, **kwargs):
+        return None
+
+    monkeypatch.setattr(crawler, "_raise_if_safe_stop", no_safe_stop)
+    monkeypatch.setattr(crawler, "_get_note_detail_evidence", lambda page, note_id: _return_async({"verified": False, "detail_root_count": 0}))
+    verified, reason, detail_count = asyncio.run(crawler._wait_for_target_note_detail(DetailPage(), note_id, timeout_ms=100))
+    assert verified is False
+    assert reason == "DETAIL_NOT_READY"
+    assert detail_count == 0
+
+
+def test_unavailable_shell_is_not_verified(tmp_path: Path, monkeypatch):
+    crawler = Crawler(app_config(tmp_path), DummyDb(), DummyLogger())
+    note_id = "66dabcde000000001f01abcd"
+
+    class DetailPage:
+        url = f"https://www.xiaohongshu.com/explore/{note_id}"
+
+        async def wait_for_timeout(self, timeout):
+            pass
+
+    async def no_safe_stop(*args, **kwargs):
+        return None
+
+    monkeypatch.setattr(crawler, "_raise_if_safe_stop", no_safe_stop)
+    monkeypatch.setattr(crawler, "_get_note_detail_evidence", lambda page, note_id: _return_async({"verified": False, "unavailable": True, "detail_root_count": 0}))
+    verified, reason, _ = asyncio.run(crawler._wait_for_target_note_detail(DetailPage(), note_id, timeout_ms=100))
+    assert verified is False
+    assert reason == "DETAIL_NOT_READY"
+
+
+def test_navigation_failures_stop_after_budget(tmp_path: Path, monkeypatch):
+    db = DummyDb()
+    crawler = Crawler(app_config(tmp_path), db, DummyLogger())
+    page = FakePage()
+    creator = app_config(tmp_path).creators[0]
+    opened = []
+
+    async def fake_open(page, profile_url, card, budget):
+        opened.append(card["note_id"])
+        return OpenNoteResult(page=page, note_id=card["note_id"], strategy="visible_cover_only", target_verified=False, reason="TARGET_NOT_VERIFIED")
+
+    monkeypatch.setattr(crawler, "_open_note_from_profile", fake_open)
+    monkeypatch.setattr(crawler, "_save_error_screenshot", lambda *args, **kwargs: _noop_async())
+    cards = [{"note_id": f"{idx:024x}"} for idx in range(4)]
+    result = asyncio.run(crawler._collect_notes(page, creator, cards, _checkpoint(tmp_path), crawler._build_budget()))
+    assert len(result.navigation_failed_ids) == 3
+    assert opened == [cards[0]["note_id"], cards[1]["note_id"], cards[2]["note_id"]]
+
+
+def test_navigation_failure_counter_resets_after_success(tmp_path: Path, monkeypatch):
+    db = DummyDb()
+    crawler = Crawler(app_config(tmp_path), db, DummyLogger())
+    page = FakePage()
+    creator = app_config(tmp_path).creators[0]
+    cards = [{"note_id": f"{idx:024x}"} for idx in range(5)]
+    opened = []
+
+    async def fake_open(page, profile_url, card, budget):
+        opened.append(card["note_id"])
+        verified = len(opened) in {3, 4}
+        return OpenNoteResult(page=page, note_id=card["note_id"], strategy="test", target_verified=verified, reason=None if verified else "TARGET_NOT_VERIFIED")
+
+    async def fake_extract(page, note_id, top_n):
+        return {"note_id": note_id, "status": "OK", "title": "ok", "top_comments": [], "raw_json": {}}
+
+    monkeypatch.setattr(crawler, "_open_note_from_profile", fake_open)
+    monkeypatch.setattr(crawler, "_extract_initial_state_note_record", lambda *args, **kwargs: _return_async(None))
+    monkeypatch.setattr(crawler_module, "extract_note_dom", fake_extract)
+    monkeypatch.setattr(crawler, "_return_to_creator_profile", lambda *args, **kwargs: _return_async({"strategy": "ok", "profile_restored": True, "route_after": "/user/profile/x"}))
+    monkeypatch.setattr(crawler, "_save_error_screenshot", lambda *args, **kwargs: _noop_async())
+    monkeypatch.setattr(crawler_module, "browser_flush_if_available", lambda *args, **kwargs: _noop_async())
+    result = asyncio.run(crawler._collect_notes(page, creator, cards, _checkpoint(tmp_path), crawler._build_budget()))
+    assert len(result.exportable_ids) == 2
+    assert len(opened) == 5
+
+
+def test_run_status_marks_navigation_unresolved_partial():
+    result = CollectionResult(attempted_ids=["1", "2"], exportable_ids=["1"], navigation_failed_ids=["2"])
+    assert determine_run_status("collect", result) == RunStatus.PARTIAL_SUCCESS_SAFE_STOP.value
+    smoke = CollectionResult(attempted_ids=["1", "2", "3"], exportable_ids=["1", "2", "3"])
+    assert determine_run_status("smoke", smoke, 3) == RunStatus.SUCCESS.value
 
 
 def test_return_to_profile_uses_history_success(tmp_path: Path, monkeypatch):

@@ -17,11 +17,21 @@ SENSITIVE_KEYS = {
     "authorization",
     "auth",
     "session",
+    "session_id",
     "password",
     "passwd",
     "xsec_token",
 }
-SENSITIVE_KEY_PARTS = ("token", "cookie", "auth", "session", "password", "passwd", "xsec")
+
+SENSITIVE_PREFIXES = ("token_", "xsec_", "credential", "secret")
+SENSITIVE_SUFFIXES = ("_token", "_cookie", "_session", "_password", "_passwd", "_secret", "_credential")
+
+
+def is_sensitive_key(key: str) -> bool:
+    key_text = str(key).strip().lower().replace("-", "_")
+    if key_text in SENSITIVE_KEYS:
+        return True
+    return key_text.startswith(SENSITIVE_PREFIXES) or key_text.endswith(SENSITIVE_SUFFIXES)
 
 
 def ensure_dirs(base_dir: Path) -> None:
@@ -65,8 +75,7 @@ def sanitize_url(url: str | None) -> str | None:
         return redact_sensitive_text(url)
     kept = []
     for key, value in parse_qsl(parts.query, keep_blank_values=True):
-        key_text = key.lower()
-        if key_text not in SENSITIVE_KEYS and not any(part in key_text for part in SENSITIVE_KEY_PARTS):
+        if not is_sensitive_key(key):
             kept.append((key, value))
     return urlunsplit((parts.scheme, parts.netloc, parts.path, urlencode(kept), ""))
 
@@ -118,8 +127,7 @@ def sanitize_json(value: Any) -> Any:
     if isinstance(value, dict):
         clean = {}
         for key, item in value.items():
-            key_text = str(key).lower()
-            if key_text in SENSITIVE_KEYS or any(part in key_text for part in SENSITIVE_KEY_PARTS):
+            if is_sensitive_key(str(key)):
                 continue
             else:
                 clean[key] = sanitize_json(item)

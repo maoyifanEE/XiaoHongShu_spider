@@ -17,6 +17,16 @@ class Checkpoint:
     current_note_id: str | None = None
     updated_at: str = field(default_factory=now_iso)
     safe_stop_reason: str | None = None
+    status: str = "RUNNING"
+    finished_at: str | None = None
+
+    @property
+    def is_complete(self) -> bool:
+        return self.status == "SUCCESS"
+
+    @property
+    def is_resumable(self) -> bool:
+        return self.status in {"RUNNING", "SAFE_STOP", "INTERRUPTED", "INCOMPLETE"}
 
     @classmethod
     def load_latest(cls, checkpoints_dir: Path, creator_id: str) -> "Checkpoint | None":
@@ -24,8 +34,23 @@ class Checkpoint:
         for path in files:
             with path.open("r", encoding="utf-8") as fh:
                 data = json.load(fh)
-            return cls(**data)
+            checkpoint = cls(**data)
+            return checkpoint if checkpoint.is_resumable else None
         return None
+
+    def mark_complete(self) -> None:
+        self.status = "SUCCESS"
+        self.finished_at = now_iso()
+        self.current_note_id = None
+        self.safe_stop_reason = None
+
+    def mark_safe_stop(self, reason: str) -> None:
+        self.status = "SAFE_STOP"
+        self.safe_stop_reason = reason
+
+    def mark_interrupted(self) -> None:
+        self.status = "INTERRUPTED"
+        self.safe_stop_reason = "USER_INTERRUPTED"
 
     def save(self, checkpoints_dir: Path) -> Path:
         self.updated_at = now_iso()
@@ -36,4 +61,3 @@ class Checkpoint:
             json.dump(asdict(self), fh, ensure_ascii=False, indent=2)
         tmp.replace(path)
         return path
-

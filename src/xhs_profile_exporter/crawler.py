@@ -26,7 +26,7 @@ from .qa import run_offline_qa
 from .runtime import CollectionResult, OpenNoteResult, RunBudget, SafeStopRequested
 from .state import LoginStatus, RunStatus
 from .time_utils import now_iso
-from .utils import canonical_note_url, sanitize_json, sanitize_url
+from .utils import is_sensitive_key, sanitize_json, sanitize_url
 
 
 class Crawler:
@@ -57,9 +57,12 @@ class Crawler:
         self.db.start_run(run_id, user_id, creator.name, self.app_config.version)
         checkpoint = Checkpoint(run_id=run_id, creator_id=user_id)
         resume_checkpoint = None
+        resume_completed: set[str] = set()
         if resume:
             resume_checkpoint = Checkpoint.load_latest(self.app_config.base_dir / "data" / "checkpoints", user_id)
             if resume_checkpoint:
+                resume_completed = set(resume_checkpoint.completed_note_ids)
+                checkpoint.completed_note_ids = sorted(resume_completed)
                 self.logger.info("RECOVERY_MODE checkpoint_run_id=%s completed=%s failed=%s", resume_checkpoint.run_id, len(resume_checkpoint.completed_note_ids), len(resume_checkpoint.failed_note_ids))
             else:
                 self.logger.info("RECOVERY_MODE no_checkpoint creator_id=%s", user_id)
@@ -111,16 +114,19 @@ class Crawler:
                 if limit:
                     note_cards = select_smoke_candidates(note_cards, int(limit)) if mode == "smoke" else note_cards[: int(limit)]
                 if resume_checkpoint:
-                    completed = set(resume_checkpoint.completed_note_ids)
                     before_resume = len(note_cards)
-                    note_cards = [card for card in note_cards if card["note_id"] not in completed]
+                    note_cards = [card for card in note_cards if card["note_id"] not in resume_completed]
                     self.logger.info("RECOVERY_MODE mapped_current_cards=%s skipped_completed=%s remaining=%s", before_resume, before_resume - len(note_cards), len(note_cards))
 
-                collection = await self._collect_notes(page, creator, note_cards, checkpoint, budget, target_exportable=target_exportable)
+                collection = await self._collect_notes(page, creator, note_cards, checkpoint, budget, target_exportable=target_exportable, initial_completed=resume_completed)
                 offline = run_offline_qa(self.db, user_id, self.logger)
                 excel_path = export_excel(self.db, self.app_config.base_dir, user_id, creator.name, self.logger)
                 database_exportable = len(self.db.current_notes(user_id))
-                status = RunStatus.SUCCESS.value if not collection.failed_ids and collection.exportable_ids else RunStatus.PARTIAL_SUCCESS_SAFE_STOP.value
+                status = determine_run_status(mode, collection, target_exportable)
+                if status == RunStatus.SUCCESS.value:
+                    checkpoint.mark_complete()
+                    checkpoint.completed_note_ids = sorted(set(checkpoint.completed_note_ids) | set(collection.exportable_ids))
+                    checkpoint.save(self.app_config.base_dir / "data" / "checkpoints")
                 self.db.finish_run(
                     run_id,
                     status,
@@ -133,15 +139,18 @@ class Crawler:
                         "attempted": collection.attempted_ids,
                         "exportable": collection.exportable_ids,
                         "non_exportable": collection.non_exportable_ids,
+                        "navigation_failed": collection.navigation_failed_ids,
+                        "non_public": collection.non_public_ids,
                         "failed": collection.failed_ids,
                     },
                 )
                 self.logger.info(
-                    "RUN finished status=%s discovered=%s attempted=%s current_run_exportable=%s non_exportable=%s failed=%s database_total_exportable=%s page_visits=%s excel=%s",
+                    "RUN finished status=%s discovered=%s attempted=%s current_run_exportable=%s navigation_failed=%s non_exportable=%s failed=%s database_total_exportable=%s page_visits=%s excel=%s",
                     status,
                     len(note_cards),
                     collection.attempted_count,
                     len(collection.exportable_ids),
+                    len(collection.navigation_failed_ids),
                     len(collection.non_exportable_ids),
                     len(collection.failed_ids),
                     database_exportable,
@@ -157,11 +166,14 @@ class Crawler:
                     "notes_completed": len(collection.exportable_ids),
                     "notes_failed": len(collection.failed_ids),
                     "notes_exportable": len(collection.exportable_ids),
+                    "navigation_failed": len(collection.navigation_failed_ids),
+                    "non_exportable": len(collection.non_exportable_ids),
                     "database_total_exportable": database_exportable,
                     "excel": str(excel_path),
                     "offline_qa": offline,
                 }
         except SafeStopRequested as stop:
+            checkpoint.mark_safe_stop(stop.reason)
             checkpoint.safe_stop_reason = stop.reason
             checkpoint.current_note_id = stop.note_id
             checkpoint.save(self.app_config.base_dir / "data" / "checkpoints")
@@ -180,7 +192,7 @@ class Crawler:
                 "safe_stop_reason": stop.reason,
             }
         except KeyboardInterrupt:
-            checkpoint.safe_stop_reason = "USER_INTERRUPTED"
+            checkpoint.mark_interrupted()
             checkpoint.save(self.app_config.base_dir / "data" / "checkpoints")
             self.db.finish_run(run_id, RunStatus.PARTIAL_SUCCESS_SAFE_STOP.value, safe_stop_reason="USER_INTERRUPTED")
             raise
@@ -232,9 +244,19 @@ class Crawler:
             await self._raise_if_safe_stop(page, "discovery_post_scroll")
         return list(seen.values())
 
-    async def _collect_notes(self, page: Page, creator: CreatorConfig, note_cards: list[dict[str, Any]], checkpoint: Checkpoint, budget: RunBudget, target_exportable: int | None = None) -> CollectionResult:
+    async def _collect_notes(
+        self,
+        page: Page,
+        creator: CreatorConfig,
+        note_cards: list[dict[str, Any]],
+        checkpoint: Checkpoint,
+        budget: RunBudget,
+        target_exportable: int | None = None,
+        initial_completed: set[str] | None = None,
+    ) -> CollectionResult:
         result = CollectionResult()
         errors = 0
+        completed = set(initial_completed or set())
         max_errors = int(self.app_config.raw.get("safety", {}).get("max_consecutive_errors", 3))
         top_n = int(self.app_config.raw.get("collection", {}).get("collect_top_comments", 3))
         for index, card in enumerate(note_cards, start=1):
@@ -249,7 +271,8 @@ class Crawler:
                 page = open_result.page
                 await self._raise_if_safe_stop(page, "note_after_open", note_id)
                 if not open_result.target_verified:
-                    result.non_exportable_ids.append(note_id)
+                    errors += 1
+                    result.navigation_failed_ids.append(note_id)
                     await self._save_error_screenshot(page, note_id, open_result.reason or "target_not_verified")
                     self.logger.info(
                         "NOTE attempt_result note_id=%s result=TARGET_NOT_VERIFIED strategy=%s detail_kind=%s reason=%s",
@@ -258,9 +281,18 @@ class Crawler:
                         open_result.detail_kind,
                         open_result.reason,
                     )
-                    errors = 0
+                    checkpoint.failed_note_ids = sorted(set(checkpoint.failed_note_ids) | {note_id})
+                    checkpoint.save(self.app_config.base_dir / "data" / "checkpoints")
+                    if errors >= max_errors:
+                        checkpoint.mark_safe_stop("MAX_CONSECUTIVE_ERRORS")
+                        checkpoint.save(self.app_config.base_dir / "data" / "checkpoints")
+                        self.logger.info("SAFE_STOP reason=MAX_CONSECUTIVE_ERRORS count=%s", errors)
+                        break
                     continue
                 await browser_flush_if_available(page)
+                initial_state_record = await self._extract_initial_state_note_record(page, note_id)
+                if initial_state_record:
+                    self.structured_by_note[note_id] = {**initial_state_record, **self.structured_by_note.get(note_id, {})}
                 note = await extract_note_dom(page, note_id, top_n)
                 if note.get("status") != "OK":
                     self.logger.info("NOTE non_ok note_id=%s status=%s reason=%s", note_id, note.get("status"), note.get("status_note"))
@@ -272,7 +304,9 @@ class Crawler:
                     result.exportable_ids.append(note_id)
                 else:
                     result.non_exportable_ids.append(note_id)
-                checkpoint.completed_note_ids = result.exportable_ids
+                    result.non_public_ids.append(note_id)
+                completed.add(note_id)
+                checkpoint.completed_note_ids = sorted(completed)
                 checkpoint.save(self.app_config.base_dir / "data" / "checkpoints")
                 errors = 0
                 self.logger.info("NOTE attempt_result note_id=%s result=PARSED title=%s likes=%s exact=%s comments=%s top_level_comments=%s status=%s target_verified=true", note_id, note.get("title"), note.get("likes_value"), note.get("likes_is_exact"), note.get("comments_value"), len(note.get("top_comments", [])), note.get("status"))
@@ -298,10 +332,10 @@ class Crawler:
                 result.failed_ids.append(note_id)
                 await self._save_error_screenshot(page, note_id, type(exc).__name__)
                 self.logger.exception("NOTE failed note_id=%s error_type=%s", note_id, type(exc).__name__)
-            checkpoint.failed_note_ids = result.failed_ids
+            checkpoint.failed_note_ids = sorted(set(checkpoint.failed_note_ids) | set(result.failed_ids))
             checkpoint.save(self.app_config.base_dir / "data" / "checkpoints")
             if errors >= max_errors:
-                checkpoint.safe_stop_reason = "MAX_CONSECUTIVE_ERRORS"
+                checkpoint.mark_safe_stop("MAX_CONSECUTIVE_ERRORS")
                 checkpoint.save(self.app_config.base_dir / "data" / "checkpoints")
                 self.logger.info("SAFE_STOP reason=MAX_CONSECUTIVE_ERRORS count=%s", errors)
                 break
@@ -374,23 +408,7 @@ class Crawler:
         except Exception as exc:
             self.logger.info("NOTE open_strategy=profile_visible_cover_click_failed note_id=%s reason=%s", note_id, type(exc).__name__)
 
-        for strategy, url in [("access_url", card.get("access_url")), ("canonical_url", card.get("canonical_url") or canonical_note_url(note_id))]:
-            if not url:
-                continue
-            budget.count_page_visit(f"note_{strategy}_navigation", note_id)
-            self.logger.info("NOTE open_strategy=%s note_id=%s", strategy, note_id)
-            await page.goto(url, wait_until="domcontentloaded")
-            await page.wait_for_timeout(3000)
-            await self._raise_if_safe_stop(page, f"note_{strategy}_loaded", note_id)
-            body_text = await page.locator("body").inner_text(timeout=3000)
-            if strategy == "canonical_url" and "当前笔记暂时无法浏览" in body_text:
-                return OpenNoteResult(page=page, note_id=note_id, strategy=strategy, target_verified=False, reason="CANONICAL_ROUTE_UNVERIFIED_RESTRICTED")
-            verified = await self._verify_target_note(page, note_id)
-            if verified:
-                return OpenNoteResult(page=page, note_id=note_id, strategy=strategy, target_verified=True, detail_kind="url_or_detail")
-            if "当前笔记暂时无法浏览" in body_text:
-                return OpenNoteResult(page=page, note_id=note_id, strategy=strategy, target_verified=False, reason=f"{strategy.upper()}_UNVERIFIED_RESTRICTED")
-        return OpenNoteResult(page=page, note_id=note_id, strategy="all_strategies", target_verified=False, reason="TARGET_NOT_VERIFIED")
+        return OpenNoteResult(page=page, note_id=note_id, strategy="visible_cover_only", target_verified=False, reason="TARGET_NOT_VERIFIED")
 
     async def _click_visible_note_cover_on_current_page(self, page: Page, creator_id: str, note_id: str, budget: RunBudget, strategy: str) -> OpenNoteResult:
         find_result = await self._find_visible_note_cover(page, creator_id, note_id)
@@ -533,9 +551,10 @@ class Crawler:
             await self._raise_if_safe_stop(page, "note_wait_target_detail", note_id)
             route_match = route_matches_note(page.url, note_id)
             wrong_route = route_is_note_detail(page.url) and not route_match
-            detail_count = await self._visible_detail_root_count(page)
+            evidence = await self._get_note_detail_evidence(page, note_id)
+            detail_count = int(evidence.get("detail_root_count") or 0)
             last_detail_count = detail_count
-            if route_match and detail_count > 0:
+            if route_match and evidence.get("verified"):
                 return True, None, detail_count
             if wrong_route:
                 return False, "TARGET_MISMATCH", detail_count
@@ -553,20 +572,110 @@ class Crawler:
         return verified
 
     async def _visible_detail_root_count(self, page: Page) -> int:
-        return int(
-            await page.evaluate(
+        evidence = await self._get_note_detail_evidence(page, "")
+        return int(evidence.get("detail_root_count") or 0)
+
+    async def _get_note_detail_evidence(self, page: Page, note_id: str) -> dict[str, Any]:
+        try:
+            return await page.evaluate(
                 """
-                () => {
-                  const roots = Array.from(document.querySelectorAll('[role="dialog"], article, main, [class*="note-detail"], [class*="noteDetail"], [class*="detail"], [class*="Detail"]'));
-                  return roots.filter((el) => {
-                    const rect = el.getBoundingClientRect();
-                    const style = window.getComputedStyle(el);
-                    return rect.width > 0 && rect.height > 0 && style.display !== "none" && style.visibility !== "hidden";
-                  }).length;
+            (noteId) => {
+              const visible = (el) => {
+                if (!el) return false;
+                const rect = el.getBoundingClientRect();
+                const style = window.getComputedStyle(el);
+                return rect.width > 0 && rect.height > 0 && style.display !== "none" && style.visibility !== "hidden";
+              };
+              const unavailableWords = ["当前笔记暂时无法浏览", "暂时无法浏览", "笔记不存在", "内容不存在", "已被删除"];
+              const bodyText = document.body ? document.body.innerText || "" : "";
+              const unavailable = unavailableWords.some((word) => bodyText.includes(word));
+              const title = document.querySelector("#detail-title");
+              const desc = document.querySelector("#detail-desc");
+              const engage = document.querySelector(".engage-bar, [class*=engage], [class*=interaction], [class*=Interact]");
+              const noteRoots = Array.from(document.querySelectorAll('[class*="note-detail"], [class*="noteDetail"], [class*="NoteDetail"], [data-testid*="note-detail"], [role="dialog"]')).filter(visible);
+              const exactLinks = noteId ? Array.from(document.querySelectorAll(`a[href*="${noteId}"]`)).filter(visible) : [];
+              const hasInitialStateNote = (root) => {
+                if (!noteId || !root || typeof root !== "object") return false;
+                const seen = new Set();
+                const queue = [root];
+                let scanned = 0;
+                while (queue.length && scanned < 5000) {
+                  const value = queue.shift();
+                  scanned += 1;
+                  if (!value || typeof value !== "object" || seen.has(value)) continue;
+                  seen.add(value);
+                  if ((value.note_id === noteId || value.id === noteId) && (value.title || value.display_title || value.desc || value.content)) return true;
+                  let children = [];
+                  try { children = Object.values(value); } catch { children = []; }
+                  for (const child of children) {
+                    if (child && typeof child === "object" && !seen.has(child)) queue.push(child);
+                  }
                 }
-                """
+                return false;
+              };
+              const strongRoot = noteRoots.some((el) => {
+                const text = el.innerText || "";
+                return !unavailable && (!noteId || text.includes(noteId) || Boolean(el.querySelector(`a[href*="${noteId}"]`)) || visible(title) || visible(desc));
+              });
+              const initialStateMatch = hasInitialStateNote(window.__INITIAL_STATE__);
+              const independentSignals = [visible(title), visible(desc), visible(engage), exactLinks.length > 0, initialStateMatch].filter(Boolean).length;
+              return {
+                verified: Boolean(!unavailable && (strongRoot || independentSignals >= 2)),
+                unavailable,
+                detail_root_count: noteRoots.length,
+                title_visible: visible(title),
+                desc_visible: visible(desc),
+                engage_visible: visible(engage),
+                exact_link_count: exactLinks.length,
+                initial_state_match: initialStateMatch,
+                independent_signals: independentSignals,
+              };
+            }
+            """,
+                note_id,
             )
-        )
+        except Exception as exc:
+            return {"verified": False, "detail_root_count": 0, "evidence_error": type(exc).__name__}
+
+    async def _extract_initial_state_note_record(self, page: Page, note_id: str) -> dict[str, Any] | None:
+        try:
+            data = await page.evaluate(
+                """
+                (noteId) => {
+                  const allow = new Set(["id", "note_id", "title", "display_title", "desc", "content", "type", "note_type", "model_type", "time", "publish_time", "liked_count", "collected_count", "comment_count", "share_count"]);
+                  const walk = (root) => {
+                    if (!root || typeof root !== "object") return null;
+                    const seen = new Set();
+                    const queue = [root];
+                    let scanned = 0;
+                    while (queue.length && scanned < 5000) {
+                      const value = queue.shift();
+                      scanned += 1;
+                      if (!value || typeof value !== "object" || seen.has(value)) continue;
+                      seen.add(value);
+                      if (value.id === noteId || value.note_id === noteId) {
+                        const out = {};
+                        for (const key of Object.keys(value)) {
+                          if (allow.has(key) && (typeof value[key] !== "object" || value[key] === null)) out[key] = value[key];
+                        }
+                        return out;
+                      }
+                      let children = [];
+                      try { children = Object.values(value); } catch { children = []; }
+                      for (const item of children) {
+                        if (item && typeof item === "object" && !seen.has(item)) queue.push(item);
+                      }
+                    }
+                    return null;
+                  };
+                  return walk(window.__INITIAL_STATE__);
+                }
+                """,
+                note_id,
+            )
+        except Exception:
+            return None
+        return sanitize_json(data) if data else None
 
     async def _return_to_creator_profile(self, page: Page, profile_url: str, note_id: str) -> dict[str, Any]:
         creator_id = extract_user_id(profile_url)
@@ -614,8 +723,9 @@ class Crawler:
         for note_id, record in records.items():
             self.structured_by_note[note_id] = record
         profile_before = self.structured_profile is not None
-        if self.current_creator_id and is_public_profile_payload(data, self.current_creator_id):
-            self.structured_profile = sanitize_json(data)
+        profile_record = extract_public_profile_record(data, self.current_creator_id) if self.current_creator_id else None
+        if profile_record:
+            self.structured_profile = profile_record
         if records or (self.structured_profile is not None and not profile_before):
             self.logger.info("STRUCTURED_RESPONSE run_id=%s extracted_note_records=%s profile_associated=%s", run_id, len(records), bool(self.structured_profile))
 
@@ -685,6 +795,20 @@ def select_smoke_candidates(cards: list[dict[str, Any]], max_attempts: int) -> l
     return selected
 
 
+def determine_run_status(mode: str, collection: CollectionResult, target_exportable: int | None = None) -> str:
+    if collection.safe_stop_reason or collection.safe_stop_status:
+        return RunStatus.PARTIAL_SUCCESS_SAFE_STOP.value
+    if mode == "smoke":
+        if target_exportable is not None and len(collection.exportable_ids) >= target_exportable and not collection.failed_ids and not collection.navigation_failed_ids:
+            return RunStatus.SUCCESS.value
+        return RunStatus.PARTIAL_SUCCESS_SAFE_STOP.value
+    if collection.failed_ids or collection.navigation_failed_ids:
+        return RunStatus.PARTIAL_SUCCESS_SAFE_STOP.value
+    if collection.attempted_ids and (collection.exportable_ids or collection.non_public_ids):
+        return RunStatus.SUCCESS.value
+    return RunStatus.PARTIAL_SUCCESS_SAFE_STOP.value
+
+
 def is_visible_note_cover_summary(summary: dict[str, Any]) -> bool:
     return bool(
         summary.get("visible")
@@ -725,7 +849,7 @@ def safe_route_summary(url: str) -> str:
         {
             key
             for key, _ in parse_qsl(parts.query, keep_blank_values=True)
-            if key and not any(word in key.lower() for word in ["token", "cookie", "auth", "session", "password", "xsec"])
+            if key and not is_sensitive_key(key)
         }
     )
     return parts.path + (f"?keys={','.join(keys)}" if keys else "")
@@ -749,6 +873,30 @@ NOTE_PUBLIC_ALLOWLIST = {
     "share_count",
 }
 
+PROFILE_PUBLIC_FIELD_ALIASES = {
+    "user_id": "user_id",
+    "id": "user_id",
+    "nickname": "nickname",
+    "name": "nickname",
+    "red_id": "xhs_id",
+    "redId": "xhs_id",
+    "xhs_id": "xhs_id",
+    "desc": "bio",
+    "bio": "bio",
+    "avatar": "avatar_url",
+    "avatar_url": "avatar_url",
+    "image": "avatar_url",
+    "fans": "followers",
+    "followers": "followers",
+    "follower_count": "followers",
+    "follows": "following",
+    "following": "following",
+    "liked": "interactions",
+    "liked_count": "interactions",
+    "interaction_count": "interactions",
+    "tags": "tags",
+}
+
 
 def extract_public_note_records(value: Any) -> dict[str, dict[str, Any]]:
     records: dict[str, dict[str, Any]] = {}
@@ -764,11 +912,33 @@ def extract_public_note_records(value: Any) -> dict[str, dict[str, Any]]:
     return records
 
 
-def is_public_profile_payload(value: Any, creator_id: str) -> bool:
+def extract_public_profile_record(value: Any, creator_id: str) -> dict[str, Any] | None:
     if isinstance(value, dict):
-        if value.get("user_id") == creator_id or value.get("id") == creator_id:
-            return any(key in value for key in ["nickname", "name", "fans", "followers"])
-        return any(is_public_profile_payload(item, creator_id) for item in value.values())
-    if isinstance(value, list):
-        return any(is_public_profile_payload(item, creator_id) for item in value)
-    return False
+        candidate_id = value.get("user_id") or value.get("id")
+        if candidate_id == creator_id:
+            record: dict[str, Any] = {"user_id": creator_id}
+            for key, out_key in PROFILE_PUBLIC_FIELD_ALIASES.items():
+                if key not in value or is_sensitive_key(key):
+                    continue
+                item = value.get(key)
+                if isinstance(item, (dict, list)) and out_key != "tags":
+                    continue
+                if out_key == "avatar_url":
+                    record[out_key] = sanitize_url(str(item)) if item else None
+                else:
+                    record[out_key] = sanitize_json(item)
+            return {key: item for key, item in record.items() if item is not None}
+        for item in value.values():
+            found = extract_public_profile_record(item, creator_id)
+            if found:
+                return found
+    elif isinstance(value, list):
+        for item in value:
+            found = extract_public_profile_record(item, creator_id)
+            if found:
+                return found
+    return None
+
+
+def is_public_profile_payload(value: Any, creator_id: str) -> bool:
+    return extract_public_profile_record(value, creator_id) is not None

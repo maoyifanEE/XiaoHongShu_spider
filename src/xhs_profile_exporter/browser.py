@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+from contextlib import suppress
 from pathlib import Path
 from typing import Any, Callable
 
@@ -63,17 +64,35 @@ class BrowserSession:
     def _schedule_response_capture(self, response: Any) -> None:
         task = asyncio.create_task(self._capture_response(response))
         self._response_tasks.add(task)
-        task.add_done_callback(self._response_tasks.discard)
+        task.add_done_callback(self._on_response_task_done)
+
+    def _on_response_task_done(self, task: asyncio.Task) -> None:
+        try:
+            exc = task.exception()
+        except asyncio.CancelledError:
+            exc = None
+        except Exception as err:
+            exc = err
+        if exc:
+            self.logger.info("BROWSER response_task_failed error_type=%s reason=%s", type(exc).__name__, _short_error(exc))
+        self._response_tasks.discard(task)
 
     async def flush_response_tasks(self, timeout: float = 10) -> None:
-        if not self._response_tasks:
+        pending = set(self._response_tasks)
+        if not pending:
             return
-        done, pending = await asyncio.wait(self._response_tasks, timeout=timeout)
+        done, still_pending = await asyncio.wait(pending, timeout=timeout)
         for task in done:
-            if task.exception():
-                self.logger.info("BROWSER response_task_failed error_type=%s", type(task.exception()).__name__)
-        if pending:
-            self.logger.info("BROWSER response_task_pending count=%s", len(pending))
+            with suppress(asyncio.CancelledError):
+                exc = task.exception()
+                if exc:
+                    self.logger.info("BROWSER response_task_failed error_type=%s reason=%s", type(exc).__name__, _short_error(exc))
+        if still_pending:
+            self.logger.info("BROWSER response_task_timeout_cancelled count=%s", len(still_pending))
+            for task in still_pending:
+                task.cancel()
+            await asyncio.gather(*still_pending, return_exceptions=True)
+            self._response_tasks.difference_update(still_pending)
 
     async def navigate_to_login_target(self, page: Page, target_url: str) -> None:
         self.logger.info("LOGIN_NAVIGATE target=creator_profile")
@@ -150,6 +169,10 @@ class BrowserSession:
         except Exception:
             return
         self.response_callback(url, data)
+
+
+def _short_error(exc: BaseException) -> str:
+    return str(exc).replace("\n", " ")[:120]
 
 
 async def detect_page_status(page: Page) -> LoginStatus:

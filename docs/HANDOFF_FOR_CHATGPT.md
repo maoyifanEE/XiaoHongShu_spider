@@ -695,3 +695,133 @@ Security scan immediately before staging:
 runtime artifact sensitive hits=0
 database sensitive hits=0
 ```
+
+## Remote Review Fix - 2026-08-20
+
+Baseline:
+
+```text
+6557ba7beaa00e5dde326ccf7d1801bf95a48b2e
+Fix XHS note navigation and crawler safety
+```
+
+Scope:
+
+```text
+This round hardens state handling before any full collect.
+It does not redesign the crawler, does not add comment scrolling, and does not run the 136-note full collect.
+```
+
+Fixes:
+
+```text
+Production direct URL fallback removed:
+- _open_note_from_profile() no longer navigates to access_url or canonical_url after cover-click failure.
+- access_url/canonical_url cannot trigger parser, upsert, ACCESS_RESTRICTED downgrade, or authoritative result.
+- navigation-probe remains the only place for diagnostic navigation experiments.
+
+Stronger target verification:
+- target_verified=True now requires exact /explore/{note_id} or /discovery/item/{note_id}
+- plus detail-specific evidence such as detail wrapper, #detail-title, #detail-desc, engage/interaction bar, exact visible note link, or exact __INITIAL_STATE__ note evidence.
+- generic main/article alone is not accepted.
+- unavailable page shell is not accepted.
+
+Optional page-natural state evidence:
+- after normal cover click, page.evaluate() may read window.__INITIAL_STATE__.
+- only exact expected note_id is accepted.
+- only public note allowlist fields are returned.
+- the whole state object is never returned or persisted.
+- absence or evaluation failure falls back to DOM evidence.
+
+Navigation failure budget:
+- VISIBLE_COVER_NOT_FOUND, CLICK_ACTION_FAILED, CLICK_NO_STATE_CHANGE, TARGET_MISMATCH, DETAIL_NOT_READY, TARGET_NOT_VERIFIED count toward max_consecutive_errors.
+- three consecutive navigation failures stop the creator with MAX_CONSECUTIVE_ERRORS.
+- successful verified parse resets the counter.
+
+Run status:
+- collect/smoke no longer report SUCCESS when unresolved navigation failures remain.
+- smoke is SUCCESS only when target exportable count is reached with no failed/navigation_failed ids.
+
+Structured profile persistence:
+- structured profile is now exact-creator public allowlist only.
+- historical project-local SQLite/raw profile artifacts were compressed from old full structured response to public allowlist.
+
+Sanitizer:
+- added is_sensitive_key().
+- author, author_id, author_name, and authority are preserved.
+- authorization, auth_token, access_token, xsec_token, session_id, and similar credential keys are removed.
+
+Checkpoint resume:
+- checkpoint now has status, finished_at, is_complete, and is_resumable.
+- SUCCESS checkpoints are ignored by --resume.
+- a newer SUCCESS checkpoint blocks accidental fallback to older SAFE_STOP checkpoints.
+- SAFE_STOP/INTERRUPTED/INCOMPLETE/RUNNING checkpoints are resumable.
+- completed_note_ids are unioned across resumed runs.
+- checkpoint serialization stores note IDs only, never Locator/ElementHandle/access_url/xsec_token.
+
+Response task lifecycle:
+- response task exceptions are consumed and logged by type/short reason.
+- flush_response_tasks() snapshots pending tasks, waits boundedly, cancels timeout tasks, and gathers with return_exceptions=True.
+
+CLI exit code:
+- collect/smoke return 0 only when all selected creators report SUCCESS.
+- login-only returns 0 only for LOGIN_OK.
+```
+
+Reference findings used:
+
+```text
+xhs-kit confirmed a Playwright-browser automation architecture and showed detail/user profile operations often depend on feed_id/xsec_token in API-style commands. This project intentionally did not adopt that API/token path.
+MediaCrawler was used only as a reminder that mature crawlers separate login, storage, and failure handling and that broad platform collection needs bounded behavior. No signing, private API replay, cookie import, stealth, proxy, or bypass method was copied.
+Visible DOM/browser-state ideas remain the only accepted source for this project's production path.
+```
+
+Tests:
+
+```powershell
+$env:PLAYWRIGHT_BROWSERS_PATH="$PWD\.ms-playwright"
+$env:PYTHONIOENCODING="utf-8"
+.\.venv\Scripts\python.exe -m pytest -q
+```
+
+Result:
+
+```text
+59 passed
+```
+
+3-note smoke:
+
+```powershell
+.\.venv\Scripts\python.exe -m xhs_profile_exporter --mode smoke
+```
+
+Result:
+
+```text
+run_id=2026-08-20T214450_0800_eba12bda
+status=SUCCESS
+attempted=3
+exportable=3
+navigation_failed=0
+non_exportable=0
+failed=0
+page_visits=7
+```
+
+Security:
+
+```text
+runtime artifact sensitive hits=0
+database sensitive hits=0
+structured_profile latest keys=['avatar_url', 'nickname', 'user_id']
+```
+
+Remaining limitations:
+
+```text
+Navigation main path remains solved in tested scope.
+Comment scrolling is not implemented in this round.
+DOM-unavailable metrics remain NULL.
+Full 136-note collection has not been executed.
+```

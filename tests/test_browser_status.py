@@ -37,6 +37,22 @@ class FakePage:
         return self.profile
 
 
+class CaptureLogger:
+    def __init__(self):
+        self.messages = []
+
+    def info(self, *args, **kwargs):
+        self.messages.append(args)
+
+
+class FakeResponse:
+    url = "https://www.xiaohongshu.com/api/test"
+    headers = {"content-type": "application/json"}
+
+    async def json(self):
+        return {"ok": True}
+
+
 def test_unknown_page_is_not_login_ok():
     session = BrowserSession(__import__("pathlib").Path("."), {"browser": {"login_timeout_minutes": 0}}, __import__("logging").getLogger("test"))
     page = FakePage(text="loading", session={"ready": False, "loginInputs": 0, "loginText": [], "sessionWords": [], "accountControls": 0})
@@ -77,3 +93,34 @@ def test_wait_for_login_does_not_repeat_goto():
     asyncio.run(session.navigate_to_login_target(page, "https://target"))
     asyncio.run(session.wait_for_login(page, "https://target"))
     assert page.goto_count == 1
+
+
+def test_response_callback_exception_is_consumed():
+    async def run():
+        logger = CaptureLogger()
+        session = BrowserSession(__import__("pathlib").Path("."), {}, logger)
+
+        def boom(url, data):
+            raise RuntimeError("callback failed with private value")
+
+        session.response_callback = boom
+        session._schedule_response_capture(FakeResponse())
+        await asyncio.sleep(0)
+        await session.flush_response_tasks(timeout=0.1)
+        assert session._response_tasks == set()
+        assert any(item and item[0] == "BROWSER response_task_failed error_type=%s reason=%s" for item in logger.messages)
+
+    asyncio.run(run())
+
+
+def test_response_task_timeout_is_cancelled_cleanly():
+    async def run():
+        logger = CaptureLogger()
+        session = BrowserSession(__import__("pathlib").Path("."), {}, logger)
+        task = asyncio.create_task(asyncio.sleep(60))
+        session._response_tasks.add(task)
+        await session.flush_response_tasks(timeout=0.01)
+        assert task.cancelled()
+        assert session._response_tasks == set()
+
+    asyncio.run(run())

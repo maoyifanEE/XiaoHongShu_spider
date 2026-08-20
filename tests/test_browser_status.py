@@ -113,6 +113,48 @@ def test_response_callback_exception_is_consumed():
     asyncio.run(run())
 
 
+def test_response_task_exception_reason_is_sanitized():
+    async def run():
+        logger = CaptureLogger()
+        session = BrowserSession(__import__("pathlib").Path("."), {}, logger)
+
+        def boom(url, data):
+            raise RuntimeError(
+                "request failed https://www.xiaohongshu.com/explore/abc?xsec_token=SECRET&keep=1 Authorization:SECRET2 token=SECRET3"
+            )
+
+        session.response_callback = boom
+        session._schedule_response_capture(FakeResponse())
+        await asyncio.sleep(0)
+        await session.flush_response_tasks(timeout=0.1)
+        rendered = " ".join(str(part) for item in logger.messages for part in item)
+        assert "SECRET" not in rendered
+        assert "xsec_token" not in rendered
+        assert "Authorization" not in rendered
+        assert "token=" not in rendered
+        assert "keep=1" in rendered
+
+    asyncio.run(run())
+
+
+def test_response_task_exception_keeps_plain_timeout_reason():
+    async def run():
+        logger = CaptureLogger()
+        session = BrowserSession(__import__("pathlib").Path("."), {}, logger)
+
+        def boom(url, data):
+            raise TimeoutError("detail timeout")
+
+        session.response_callback = boom
+        session._schedule_response_capture(FakeResponse())
+        await asyncio.sleep(0)
+        await session.flush_response_tasks(timeout=0.1)
+        rendered = " ".join(str(part) for item in logger.messages for part in item)
+        assert "detail timeout" in rendered
+
+    asyncio.run(run())
+
+
 def test_response_task_timeout_is_cancelled_cleanly():
     async def run():
         logger = CaptureLogger()

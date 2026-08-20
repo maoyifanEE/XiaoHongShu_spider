@@ -83,12 +83,24 @@ def sanitize_url(url: str | None) -> str | None:
 def redact_sensitive_text(text: str) -> str:
     redacted = text
     redacted = re.sub(
-        r"(?i)(?:xsec_token|token|authorization|session|cookie|password|bearer)=([^&\s]+)",
+        r"(?i)(?:xsec_token|access_token|auth_token|token|authorization|session|cookie|password|bearer)=([^&\s]+)",
+        "[REDACTED_CREDENTIAL]",
+        redacted,
+    )
+    redacted = re.sub(
+        r"(?i)(authorization|cookie|session)\s*[:：]\s*[^,\s;]+",
         "[REDACTED_CREDENTIAL]",
         redacted,
     )
     redacted = re.sub(r"(?i)Bearer\s+[A-Za-z0-9._~+/=-]+", "[REDACTED_CREDENTIAL]", redacted)
     return redacted
+
+
+def sanitize_exception_message(exc: BaseException, limit: int = 120) -> str:
+    text = str(exc).replace("\n", " ")
+    url_pattern = re.compile(r"https?://[^\s\"'<>]+")
+    text = url_pattern.sub(lambda match: sanitize_url(match.group(0)) or "[REDACTED_URL]", text)
+    return redact_sensitive_text(text)[:limit]
 
 
 def canonical_profile_url(user_id: str) -> str:

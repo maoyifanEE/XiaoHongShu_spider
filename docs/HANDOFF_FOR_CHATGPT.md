@@ -825,3 +825,198 @@ Comment scrolling is not implemented in this round.
 DOM-unavailable metrics remain NULL.
 Full 136-note collection has not been executed.
 ```
+
+## Pre-Full-Run Reliability + Endurance - 2026-08-20
+
+Baseline:
+
+```text
+fe041c56e084f94ddd565e3dd1d54246594232a7
+Harden XHS crawler state and recovery handling
+```
+
+Scope:
+
+```text
+This round validates reliability before any full 136-note collection.
+It does not implement comments, does not run the 136-note full collect, and does not deploy.
+```
+
+Code fixes:
+
+```text
+Parser detail root tightening:
+- extract_note_dom() no longer accepts generic main/article/[class*=detail] or visible text length as the official parse root.
+- note parsing now requires a detail-specific wrapper/dialog plus evidence such as #detail-title, #detail-desc, engage/interaction bar, or an exact note link inside the detail scope.
+- if a strong detail root is unavailable, parser returns PARSE_PARTIAL instead of widening scope to page shell/recommendations.
+- parser tests cover generic main recommendation pollution, article shell rejection, strong detail root extraction, and sidebar fake metric isolation.
+
+Safe-stop reason propagation:
+- MAX_CONSECUTIVE_ERRORS is now copied into CollectionResult.safe_stop_reason when the consecutive failure budget is hit.
+- collection safe_stop_reason is written to DB crawl_runs.safe_stop_reason, crawl_runs.notes, CLI JSON, checkpoint, and logs.
+- RunBudget reasons are normalized to RUNTIME_LIMIT and PAGE_VISIT_LIMIT.
+
+Response task error sanitization:
+- response task exception logging now uses sanitize_exception_message().
+- URLs are sanitized before truncation.
+- xsec_token/access_token/auth_token/authorization/cookie/session/token/bearer fragments are redacted before log persistence.
+
+Run diagnostics:
+- CollectionResult now records verified note IDs, navigation strategy counts, profile return counts, note field presence, note field source counts, and profile field presence.
+- Diagnostics are count-only / field-name-only and do not store complete __INITIAL_STATE__ payloads.
+```
+
+Tests:
+
+```powershell
+$env:PLAYWRIGHT_BROWSERS_PATH="$PWD\.ms-playwright"
+$env:PYTHONIOENCODING="utf-8"
+.\.venv\Scripts\python.exe -m pytest -q
+```
+
+Result:
+
+```text
+66 passed in 20.84s
+```
+
+Diff check:
+
+```text
+git diff --check: pass
+Only Windows LF->CRLF warnings were printed.
+```
+
+3-note smoke:
+
+```powershell
+.\.venv\Scripts\python.exe -m xhs_profile_exporter --mode smoke
+```
+
+Result:
+
+```text
+run_id=2026-08-20T220942_0800_ad8e0fc5
+status=SUCCESS
+login_status=LOGIN_OK
+requested_exportable=3
+discovered=12
+attempted=3
+target_verified=3
+exportable=3
+navigation_failed=0
+non_exportable=0
+failed=0
+safe_stop=None
+page_visits=7
+navigation_strategy_counts={'COVER_LOCATOR_CLICK': 3}
+profile_return_counts={'PROFILE_RETURN_HISTORY_SUCCESS': 3}
+excel=output\辣香郭_小红书公开信息_20260820_221046.xlsx
+```
+
+20-note endurance:
+
+```powershell
+.\.venv\Scripts\python.exe -m xhs_profile_exporter --mode collect --max-notes 20
+```
+
+Result:
+
+```text
+run_id=2026-08-20T221104_0800_4c7a5d0b
+start_time=2026-08-20T22:11:04+08:00
+end_time=2026-08-20T22:15:57+08:00
+elapsed_time=4m53s
+requested=20
+discovered=20
+attempted=20
+target_verified=20
+exportable=20
+navigation_failed=0
+non_exportable=0
+parse_failed=0
+safe_stop=None
+page_visits=23
+database_total_exportable=22
+excel=output\辣香郭_小红书公开信息_20260820_221557.xlsx
+offline_qa=PASS
+```
+
+Navigation strategy distribution:
+
+```text
+current_visible_cover=18
+scan_to_target_cover=2
+center_click_fallback=0
+navigation_failed=0
+```
+
+Profile return statistics:
+
+```text
+profile_history_return=20
+profile_goto_fallback=0
+profile_return_failed=0
+```
+
+Field completeness for endurance verified notes:
+
+```text
+title         20/20 100%
+body          20/20 100%
+note_type     19/20 95%
+publish_time  18/20 90%
+like_count     0/20 0%
+collect_count  0/20 0%
+comment_count  3/20 15%
+share_count    0/20 0%
+tags          17/20 85%
+```
+
+Field source counts:
+
+```text
+title: DOM=20
+body: DOM=20
+note_type: DOM=19, MISSING=1
+publish_time: DOM=18, MISSING=2
+like_count: MISSING=20
+collect_count: MISSING=20
+comment_count: DOM=3, MISSING=17
+share_count: MISSING=20
+tags: DOM=17, MISSING=3
+```
+
+Profile field completeness from the same run:
+
+```text
+nickname=present DOM
+user_id=present DOM
+description=present DOM
+followers=present DOM
+following=missing
+likes_interaction=present DOM
+xhs_id=present DOM
+avatar_url=present DOM
+ip_location=present DOM
+profile_tags=missing
+identity_tags=missing
+gender=missing
+```
+
+Security scan after live tests:
+
+```text
+runtime artifact sensitive hits=0
+database sensitive hits=0
+```
+
+Important interpretation:
+
+```text
+Navigation is stable in the 20-note tested scope: 20/20 exact target verification, 20/20 exportable, 20/20 history return.
+Strict parser scope avoids recommendation/sidebar pollution but currently exposes a clear parser gap for like/collect/share metrics: they were not visible inside the accepted detail root in this endurance run, so they remain NULL instead of being guessed from nearby UI.
+Comment正文 remains intentionally out of scope. top_level_comments may be 0 and is not part of field completeness.
+COMMENTS = NOT IMPLEMENTED
+FULL 136 = NOT EXECUTED
+```

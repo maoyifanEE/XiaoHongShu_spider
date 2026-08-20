@@ -20,6 +20,7 @@ from .extractors import (
     extract_profile_dom,
     extract_user_id,
     merge_note_with_structured,
+    note_completeness_values,
 )
 from .exporter import export_excel
 from .qa import run_offline_qa
@@ -98,6 +99,7 @@ class Crawler:
                 if self.structured_profile:
                     profile["raw_json"] = {**(profile.get("raw_json") or {}), "structured": self.structured_profile}
                     profile["source"] = "dom+page_response"
+                profile_completeness = summarize_profile_fields(profile)
                 self.db.save_profile_snapshot(user_id, profile)
                 self._write_raw("profile", user_id, run_id, profile)
                 self.logger.info("PROFILE captured nickname=%s followers=%s raw=%s", profile.get("nickname"), profile.get("followers_value"), profile.get("followers_raw"))
@@ -137,37 +139,57 @@ class Crawler:
                     notes_failed=len(collection.failed_ids),
                     notes={
                         "attempted": collection.attempted_ids,
+                        "verified": collection.verified_ids,
                         "exportable": collection.exportable_ids,
                         "non_exportable": collection.non_exportable_ids,
                         "navigation_failed": collection.navigation_failed_ids,
                         "non_public": collection.non_public_ids,
                         "failed": collection.failed_ids,
+                        "safe_stop_reason": collection.safe_stop_reason,
+                        "navigation_strategy_counts": collection.navigation_strategy_counts,
+                        "profile_return_counts": collection.profile_return_counts,
+                        "field_presence": collection.field_presence,
+                        "field_source_counts": collection.field_source_counts,
+                        "profile_fields": profile_completeness,
                     },
+                    safe_stop_reason=collection.safe_stop_reason,
                 )
                 self.logger.info(
-                    "RUN finished status=%s discovered=%s attempted=%s current_run_exportable=%s navigation_failed=%s non_exportable=%s failed=%s database_total_exportable=%s page_visits=%s excel=%s",
+                    "RUN finished status=%s discovered=%s attempted=%s target_verified=%s current_run_exportable=%s navigation_failed=%s non_exportable=%s failed=%s safe_stop_reason=%s database_total_exportable=%s page_visits=%s excel=%s",
                     status,
                     len(note_cards),
                     collection.attempted_count,
+                    len(collection.verified_ids),
                     len(collection.exportable_ids),
                     len(collection.navigation_failed_ids),
                     len(collection.non_exportable_ids),
                     len(collection.failed_ids),
+                    collection.safe_stop_reason,
                     database_exportable,
                     budget.page_visits,
                     excel_path,
                 )
+                self.logger.info("RUN navigation_strategy_counts=%s profile_return_counts=%s", collection.navigation_strategy_counts, collection.profile_return_counts)
+                self.logger.info("RUN field_presence=%s field_sources=%s profile_fields=%s", collection.field_presence, collection.field_source_counts, profile_completeness)
                 return {
                     "run_id": run_id,
                     "status": status,
                     "login_status": LoginStatus.LOGIN_OK.value,
                     "notes_discovered": len(note_cards),
                     "notes_attempted": collection.attempted_count,
+                    "target_verified": len(collection.verified_ids),
                     "notes_completed": len(collection.exportable_ids),
                     "notes_failed": len(collection.failed_ids),
                     "notes_exportable": len(collection.exportable_ids),
                     "navigation_failed": len(collection.navigation_failed_ids),
                     "non_exportable": len(collection.non_exportable_ids),
+                    "safe_stop_reason": collection.safe_stop_reason,
+                    "page_visits": budget.page_visits,
+                    "navigation_strategy_counts": collection.navigation_strategy_counts,
+                    "profile_return_counts": collection.profile_return_counts,
+                    "field_presence": collection.field_presence,
+                    "field_source_counts": collection.field_source_counts,
+                    "profile_fields": profile_completeness,
                     "database_total_exportable": database_exportable,
                     "excel": str(excel_path),
                     "offline_qa": offline,
@@ -269,6 +291,7 @@ class Crawler:
                 self.logger.info("[%s/%s] NOTE attempt note_id=%s phase=open candidate_rank=%s pinned=%s", index, len(note_cards), note_id, index, card.get("is_pinned"))
                 open_result = await self._open_note_from_profile(page, creator.url, card, budget)
                 page = open_result.page
+                result.count_navigation_strategy(open_result.strategy)
                 await self._raise_if_safe_stop(page, "note_after_open", note_id)
                 if not open_result.target_verified:
                     errors += 1
@@ -286,9 +309,11 @@ class Crawler:
                     if errors >= max_errors:
                         checkpoint.mark_safe_stop("MAX_CONSECUTIVE_ERRORS")
                         checkpoint.save(self.app_config.base_dir / "data" / "checkpoints")
+                        result.safe_stop_reason = "MAX_CONSECUTIVE_ERRORS"
                         self.logger.info("SAFE_STOP reason=MAX_CONSECUTIVE_ERRORS count=%s", errors)
                         break
                     continue
+                result.verified_ids.append(note_id)
                 await browser_flush_if_available(page)
                 initial_state_record = await self._extract_initial_state_note_record(page, note_id)
                 if initial_state_record:
@@ -298,6 +323,7 @@ class Crawler:
                     self.logger.info("NOTE non_ok note_id=%s status=%s reason=%s", note_id, note.get("status"), note.get("status_note"))
                 note.update({k: card.get(k) for k in ("is_pinned",) if card.get(k) is not None})
                 note = merge_note_with_structured(note, self.structured_by_note.get(note_id))
+                record_note_field_stats(result, note)
                 self.db.upsert_note(creator.user_id or extract_user_id(creator.url), note)
                 self._write_raw("note", note_id, checkpoint.run_id, note)
                 if note.get("status") in {"OK", "PARSE_PARTIAL"}:
@@ -311,6 +337,7 @@ class Crawler:
                 errors = 0
                 self.logger.info("NOTE attempt_result note_id=%s result=PARSED title=%s likes=%s exact=%s comments=%s top_level_comments=%s status=%s target_verified=true", note_id, note.get("title"), note.get("likes_value"), note.get("likes_is_exact"), note.get("comments_value"), len(note.get("top_comments", [])), note.get("status"))
                 return_result = await self._return_to_creator_profile(page, creator.url, note_id)
+                result.count_profile_return(return_result["strategy"])
                 self.logger.info(
                     "NOTE return_result note_id=%s strategy=%s profile_restored=%s route_after=%s",
                     note_id,
@@ -337,6 +364,7 @@ class Crawler:
             if errors >= max_errors:
                 checkpoint.mark_safe_stop("MAX_CONSECUTIVE_ERRORS")
                 checkpoint.save(self.app_config.base_dir / "data" / "checkpoints")
+                result.safe_stop_reason = "MAX_CONSECUTIVE_ERRORS"
                 self.logger.info("SAFE_STOP reason=MAX_CONSECUTIVE_ERRORS count=%s", errors)
                 break
             if target_exportable is not None and len(result.exportable_ids) >= target_exportable:
@@ -807,6 +835,44 @@ def determine_run_status(mode: str, collection: CollectionResult, target_exporta
     if collection.attempted_ids and (collection.exportable_ids or collection.non_public_ids):
         return RunStatus.SUCCESS.value
     return RunStatus.PARTIAL_SUCCESS_SAFE_STOP.value
+
+
+def record_note_field_stats(result: CollectionResult, note: dict[str, Any]) -> None:
+    values = note_completeness_values(note)
+    sources = note.get("field_sources") or {}
+    for field_name, value in values.items():
+        result.record_field(field_name, field_value_present(value), sources.get(field_name))
+
+
+def summarize_profile_fields(profile: dict[str, Any]) -> dict[str, dict[str, Any]]:
+    fields = {
+        "nickname": profile.get("nickname"),
+        "user_id": extract_user_id(profile.get("canonical_url") or "") if profile.get("canonical_url") else None,
+        "description": profile.get("bio"),
+        "followers": profile.get("followers_value"),
+        "following": profile.get("following_value"),
+        "likes_interaction": profile.get("total_interactions_value"),
+        "xhs_id": profile.get("xhs_id"),
+        "avatar_url": profile.get("avatar_url"),
+        "ip_location": profile.get("ip_location"),
+        "profile_tags": profile.get("profile_tags"),
+        "identity_tags": profile.get("identity_tags"),
+        "gender": profile.get("gender"),
+    }
+    return {
+        field: {"present": field_value_present(value), "source": "DOM" if field_value_present(value) else "MISSING"}
+        for field, value in fields.items()
+    }
+
+
+def field_value_present(value: Any) -> bool:
+    if value is None:
+        return False
+    if isinstance(value, str):
+        return bool(value.strip())
+    if isinstance(value, (list, tuple, set, dict)):
+        return bool(value)
+    return True
 
 
 def is_visible_note_cover_summary(summary: dict[str, Any]) -> bool:

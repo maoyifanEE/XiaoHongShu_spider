@@ -9,7 +9,7 @@ from typing import Any, Callable
 from playwright.async_api import BrowserContext, Page, async_playwright
 
 from .state import LoginStatus
-from .utils import sanitize_url
+from .utils import sanitize_exception_message, sanitize_url
 
 VERIFICATION_WORDS = ["验证码", "滑块", "扫码验证", "短信验证", "安全验证", "人机验证", "captcha"]
 RISK_WORDS = ["访问频繁", "风险", "异常访问", "当前环境异常", "请稍后再试", "账号异常"]
@@ -74,7 +74,7 @@ class BrowserSession:
         except Exception as err:
             exc = err
         if exc:
-            self.logger.info("BROWSER response_task_failed error_type=%s reason=%s", type(exc).__name__, _short_error(exc))
+            self.logger.info("BROWSER response_task_failed error_type=%s reason=%s", type(exc).__name__, sanitize_exception_message(exc))
         self._response_tasks.discard(task)
 
     async def flush_response_tasks(self, timeout: float = 10) -> None:
@@ -86,7 +86,7 @@ class BrowserSession:
             with suppress(asyncio.CancelledError):
                 exc = task.exception()
                 if exc:
-                    self.logger.info("BROWSER response_task_failed error_type=%s reason=%s", type(exc).__name__, _short_error(exc))
+                    self.logger.info("BROWSER response_task_failed error_type=%s reason=%s", type(exc).__name__, sanitize_exception_message(exc))
         if still_pending:
             self.logger.info("BROWSER response_task_timeout_cancelled count=%s", len(still_pending))
             for task in still_pending:
@@ -169,10 +169,6 @@ class BrowserSession:
         except Exception:
             return
         self.response_callback(url, data)
-
-
-def _short_error(exc: BaseException) -> str:
-    return str(exc).replace("\n", " ")[:120]
 
 
 async def detect_page_status(page: Page) -> LoginStatus:

@@ -396,7 +396,41 @@ def test_navigation_failures_stop_after_budget(tmp_path: Path, monkeypatch):
     cards = [{"note_id": f"{idx:024x}"} for idx in range(4)]
     result = asyncio.run(crawler._collect_notes(page, creator, cards, _checkpoint(tmp_path), crawler._build_budget()))
     assert len(result.navigation_failed_ids) == 3
+    assert result.safe_stop_reason == "MAX_CONSECUTIVE_ERRORS"
     assert opened == [cards[0]["note_id"], cards[1]["note_id"], cards[2]["note_id"]]
+    checkpoint_path = next((tmp_path / "data" / "checkpoints").glob("*_creator.json"))
+    assert "MAX_CONSECUTIVE_ERRORS" in checkpoint_path.read_text(encoding="utf-8")
+
+
+def test_run_result_and_db_include_collect_safe_stop_reason(tmp_path: Path, monkeypatch):
+    db = DummyDb()
+    crawler = Crawler(app_config(tmp_path), db, DummyLogger())
+
+    async def fake_profile(*args, **kwargs):
+        return {"captured_at": "now", "nickname": "n", "canonical_url": app_config(tmp_path).creators[0].url, "source": "test"}
+
+    async def fake_discover(*args, **kwargs):
+        return [{"note_id": f"{idx:024x}"} for idx in range(3)]
+
+    async def fake_collect(*args, **kwargs):
+        return CollectionResult(
+            attempted_ids=[f"{idx:024x}" for idx in range(3)],
+            navigation_failed_ids=[f"{idx:024x}" for idx in range(3)],
+            safe_stop_reason="MAX_CONSECUTIVE_ERRORS",
+        )
+
+    monkeypatch.setattr(crawler_module, "BrowserSession", FakeBrowserSession)
+    monkeypatch.setattr(crawler_module, "extract_profile_dom", fake_profile)
+    monkeypatch.setattr(crawler, "_discover_notes", fake_discover)
+    monkeypatch.setattr(crawler, "_collect_notes", fake_collect)
+    monkeypatch.setattr(crawler_module, "run_offline_qa", lambda *args, **kwargs: {"passed": True})
+    monkeypatch.setattr(crawler_module, "export_excel", lambda *args, **kwargs: tmp_path / "out.xlsx")
+
+    result = asyncio.run(crawler._run_creator(app_config(tmp_path).creators[0], "collect"))
+    assert result["status"] == RunStatus.PARTIAL_SUCCESS_SAFE_STOP.value
+    assert result["safe_stop_reason"] == "MAX_CONSECUTIVE_ERRORS"
+    assert db.finished["safe_stop_reason"] == "MAX_CONSECUTIVE_ERRORS"
+    assert db.finished["notes"]["safe_stop_reason"] == "MAX_CONSECUTIVE_ERRORS"
 
 
 def test_navigation_failure_counter_resets_after_success(tmp_path: Path, monkeypatch):

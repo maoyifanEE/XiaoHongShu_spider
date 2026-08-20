@@ -128,17 +128,34 @@ async def extract_note_dom(page: Any, note_id: str, top_n: int = 3) -> dict[str,
         """
         (noteId) => {
           const meta = Object.fromEntries(Array.from(document.querySelectorAll("meta")).map(m => [m.getAttribute("name") || m.getAttribute("property") || "", m.getAttribute("content") || ""]));
-          const roots = Array.from(document.querySelectorAll('[role="dialog"], article, main, [class*="note-detail"], [class*="noteDetail"], [class*="detail"]'));
-          const visibleRoots = roots.filter((el) => {
+          const visible = (el) => {
+            if (!el) return false;
             const rect = el.getBoundingClientRect();
             const style = window.getComputedStyle(el);
             return rect.width > 0 && rect.height > 0 && style.display !== "none" && style.visibility !== "hidden";
+          };
+          const detailSelector = '[class*="note-detail"], [class*="noteDetail"], [class*="NoteDetail"], [data-testid*="note-detail"], [role="dialog"]';
+          const evidenceSelectors = '#detail-title, #detail-desc, .engage-bar, [class*=engage], [class*=interaction], [class*=Interact]';
+          const detailRoots = Array.from(document.querySelectorAll(detailSelector)).filter(visible);
+          const evidence = Array.from(document.querySelectorAll(evidenceSelectors)).filter(visible);
+          const evidenceRoot = evidence.map((el) => el.closest(detailSelector)).find((el) => el && visible(el));
+          const root = evidenceRoot || detailRoots.find((el) => {
+            const hasEvidence = Boolean(el.querySelector(evidenceSelectors));
+            const hasExactLink = noteId ? Boolean(el.querySelector(`a[href*="${noteId}"]`)) : false;
+            return hasEvidence || hasExactLink;
           });
-          const root = visibleRoots.find((el) => (el.innerText || "").includes(noteId) || el.querySelector(`a[href*="${noteId}"]`)) || visibleRoots.find((el) => (el.innerText || "").length > 80);
-          if (!root) return {rootFound: false, meta, url: location.href};
+          if (!root) {
+            return {
+              rootFound: false,
+              rootReason: "NO_STRONG_DETAIL_ROOT",
+              meta,
+              url: location.href,
+              diagnostics: {detailRootCount: detailRoots.length, evidenceCount: evidence.length}
+            };
+          }
           const q = (selectors) => selectors.map((sel) => root.querySelector(sel)).find(Boolean);
-          const titleEl = q(["h1", "[class*=title]", "[data-testid*=title]"]);
-          const descEl = q(["[class*=desc]", "[class*=content]", ".note-content", "[data-testid*=content]"]);
+          const titleEl = q(["#detail-title", "h1", "[class*=title]", "[data-testid*=title]"]);
+          const descEl = q(["#detail-desc", "[class*=desc]", "[class*=content]", ".note-content", "[data-testid*=content]"]);
           const commentEls = Array.from(root.querySelectorAll('[class*=comment-item], [class*=commentItem], [data-testid*=comment]')).slice(0, 20);
           const comments = commentEls.map((el) => {
              const childComment = el.parentElement && el.parentElement.closest('[class*=comment-item], [class*=commentItem], [data-testid*=comment]') !== el;
@@ -151,6 +168,7 @@ async def extract_note_dom(page: Any, note_id: str, top_n: int = 3) -> dict[str,
           });
           return {
             rootFound: true,
+            rootReason: evidenceRoot ? "DETAIL_EVIDENCE_ROOT" : "DETAIL_WRAPPER_ROOT",
             text: root.innerText || "",
             title: titleEl ? titleEl.innerText : "",
             desc: descEl ? descEl.innerText : "",
@@ -188,8 +206,22 @@ async def extract_note_dom(page: Any, note_id: str, top_n: int = 3) -> dict[str,
         "status": unavailable_status[0] if unavailable_status else ("OK" if body or title else "PARSE_PARTIAL"),
         "status_note": unavailable_status[1] if unavailable_status else (None if body or title else "DOM 未提取到标题或正文"),
         "top_comments": comments,
-        "raw_json": {"meta": data.get("meta"), "url": sanitize_url(data.get("url"))},
+        "raw_json": {"meta": data.get("meta"), "url": sanitize_url(data.get("url")), "root_reason": data.get("rootReason")},
         "source": "dom",
+        "field_sources": _note_field_sources(
+            {
+                "title": title,
+                "body": body,
+                "note_type": note_type_from_text(text) or ("视频" if "video" in json.dumps(data.get("meta", {})).lower() else None),
+                "publish_time": publish_time,
+                "like_count": metrics.get("likes_value"),
+                "collect_count": metrics.get("collects_value"),
+                "comment_count": metrics.get("comments_value"),
+                "share_count": metrics.get("shares_value"),
+                "tags": hashtags,
+            },
+            "DOM",
+        ),
         **metrics,
     }
 
@@ -197,13 +229,21 @@ async def extract_note_dom(page: Any, note_id: str, top_n: int = 3) -> dict[str,
 def merge_note_with_structured(note: dict[str, Any], structured: dict[str, Any] | None) -> dict[str, Any]:
     if not structured:
         return note
+    field_sources = dict(note.get("field_sources") or {})
     candidates = _find_dicts_with_note_id(structured, note["note_id"])
     for item in candidates:
         title = item.get("title") or item.get("display_title")
         desc = item.get("desc") or item.get("content")
-        note["title"] = note.get("title") or title
-        note["body"] = note.get("body") or desc
-        note["note_type"] = note.get("note_type") or _structured_note_type(item)
+        if not note.get("title") and title:
+            note["title"] = title
+            field_sources["title"] = "INITIAL_STATE"
+        if not note.get("body") and desc:
+            note["body"] = desc
+            field_sources["body"] = "INITIAL_STATE"
+        structured_type = _structured_note_type(item)
+        if not note.get("note_type") and structured_type:
+            note["note_type"] = structured_type
+            field_sources["note_type"] = "INITIAL_STATE"
         for key, out in [
             ("liked_count", "likes"),
             ("collected_count", "collects"),
@@ -215,10 +255,13 @@ def merge_note_with_structured(note: dict[str, Any], structured: dict[str, Any] 
                 note[f"{out}_value"] = value
                 note[f"{out}_raw"] = raw
                 note[f"{out}_is_exact"] = exact
+                field_sources[_metric_field_name(out)] = "INITIAL_STATE"
         if item.get("time") and not note.get("publish_time"):
             note["publish_time"] = str(item.get("time"))
             note["publish_time_raw"] = str(item.get("time"))
+            field_sources["publish_time"] = "INITIAL_STATE"
         break
+    note["field_sources"] = _normalize_note_field_sources(note, field_sources)
     return note
 
 
@@ -337,6 +380,7 @@ def _empty_note(note_id: str, status: str, status_note: str, raw: dict[str, Any]
         "top_comments": [],
         "raw_json": {"url": sanitize_url((raw or {}).get("url"))},
         "source": "dom",
+        "field_sources": _note_field_sources({}, "DOM"),
         "likes_value": None,
         "likes_raw": None,
         "likes_is_exact": None,
@@ -350,6 +394,64 @@ def _empty_note(note_id: str, status: str, status_note: str, raw: dict[str, Any]
         "shares_raw": None,
         "shares_is_exact": None,
     }
+
+
+def _metric_field_name(metric_prefix: str) -> str:
+    return {
+        "likes": "like_count",
+        "collects": "collect_count",
+        "comments": "comment_count",
+        "shares": "share_count",
+    }[metric_prefix]
+
+
+def _note_field_sources(values: dict[str, Any], source: str) -> dict[str, str]:
+    return {field: (source if _field_present(values.get(field)) else "MISSING") for field in NOTE_COMPLETENESS_FIELDS}
+
+
+def _normalize_note_field_sources(note: dict[str, Any], field_sources: dict[str, str]) -> dict[str, str]:
+    values = note_completeness_values(note)
+    return {
+        field: field_sources.get(field, "MISSING") if _field_present(values.get(field)) else "MISSING"
+        for field in NOTE_COMPLETENESS_FIELDS
+    }
+
+
+NOTE_COMPLETENESS_FIELDS = [
+    "title",
+    "body",
+    "note_type",
+    "publish_time",
+    "like_count",
+    "collect_count",
+    "comment_count",
+    "share_count",
+    "tags",
+]
+
+
+def note_completeness_values(note: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "title": note.get("title"),
+        "body": note.get("body"),
+        "note_type": note.get("note_type"),
+        "publish_time": note.get("publish_time"),
+        "like_count": note.get("likes_value"),
+        "collect_count": note.get("collects_value"),
+        "comment_count": note.get("comments_value"),
+        "share_count": note.get("shares_value"),
+        "tags": note.get("hashtags"),
+    }
+
+
+def _field_present(value: Any) -> bool:
+    if value is None:
+        return False
+    if isinstance(value, str):
+        return bool(value.strip())
+    if isinstance(value, (list, tuple, set, dict)):
+        return bool(value)
+    return True
 
 
 def _extract_labeled_counts(text: str, labels: list[str]) -> dict[str, str]:

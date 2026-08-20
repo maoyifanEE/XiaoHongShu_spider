@@ -1302,3 +1302,81 @@ Result:
 ```text
 43 passed in 32.62s
 ```
+
+## Structured Extraction Offline Hardening - 2026-08-20
+
+Baseline:
+
+```text
+d64f4f0eb25bbad56efb042e5855b6ae7c72cb07
+Isolate XHS crawler state across runs
+```
+
+Known live state remains unchanged from the last live run:
+
+```text
+12 notes successfully completed and exported
+candidate 13 detected RISK_CONTROL_DETECTED
+crawler safely stopped
+NO automatic retry was performed
+```
+
+This round was offline only:
+
+```text
+NO LIVE XHS TEST THIS ROUND
+No --mode smoke / collect / login-only / navigation-probe was run.
+No browser was opened against a real XHS page.
+No cooldown, stealth, proxy, cookie import, direct URL, API replay, signature replay, or risk-control bypass was added.
+COMMENTS = NOT IMPLEMENTED
+FULL 136 = NOT EXECUTED
+```
+
+Fixes made:
+
+```text
+- same-response note records now merge non-destructively before entering _capture_structured().
+- same-response note merge is order-independent for richer versus sparse records.
+- generic 24-character id is no longer enough to classify an object as a note.
+- explicit note_id/noteId remains accepted as strong note identity.
+- generic id note candidates now require note schema evidence such as interactInfo, tagList, displayTitle, noteType, or modelType.
+- structured note traversal is bounded with MAX_STRUCTURED_NODES_PER_RESPONSE=5000 and seen-object deduplication.
+- same-response profile extraction now collects and merges all exact creator candidates instead of returning the first match.
+- profile traversal is bounded by the same response-node limit.
+- structured note records now carry small field-level provenance in _field_sources using allowlisted field names and normalized source enums only.
+- tags provenance merges deterministically, for example PAGE_RESPONSE+DETAIL_INITIAL_STATE.
+- _run_creator() now clears current_run_id/current_creator_id and transient structured caches after creator run completion.
+- late response callbacks after run cleanup are ignored by run_id mismatch.
+```
+
+Validation:
+
+```powershell
+$env:PLAYWRIGHT_BROWSERS_PATH="$PWD\.ms-playwright"
+$env:PYTHONIOENCODING="utf-8"
+.\.venv\Scripts\python.exe -m pytest tests\test_crawler_navigation.py tests\test_security_sanitization.py tests\test_extractors_dom.py -q
+```
+
+Result:
+
+```text
+62 passed in 32.93s
+```
+
+Full offline validation:
+
+```powershell
+$env:PLAYWRIGHT_BROWSERS_PATH="$PWD\.ms-playwright"
+$env:PYTHONIOENCODING="utf-8"
+.\.venv\Scripts\python.exe -m pytest -q
+git diff --check
+.\.venv\Scripts\python.exe -m xhs_profile_exporter --mode qa-only
+```
+
+Results:
+
+```text
+pytest: 98 passed in 39.22s
+git diff --check: passed, only Windows LF/CRLF warnings
+qa-only: passed=True
+```

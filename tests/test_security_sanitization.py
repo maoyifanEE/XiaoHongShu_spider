@@ -54,7 +54,7 @@ def test_structured_exact_note_id_allowlist_only():
     records = extract_public_note_records(
         {
             "items": [
-                {"id": note_id, "title": "标题", "xsec_token": "SECRET", "private": "nope"},
+                {"noteId": note_id, "title": "标题", "xsec_token": "SECRET", "private": "nope"},
                 {"some_text": unrelated},
             ]
         }

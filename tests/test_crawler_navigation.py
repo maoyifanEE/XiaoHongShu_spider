@@ -9,6 +9,8 @@ from xhs_profile_exporter.config import AppConfig, CreatorConfig
 from xhs_profile_exporter.crawler import (
     Crawler,
     determine_run_status,
+    extract_public_note_records,
+    extract_public_profile_record,
     merge_public_note_records,
     merge_public_profile_records,
     route_matches_note,
@@ -250,7 +252,7 @@ def test_multi_creator_structured_state_isolation(tmp_path: Path, monkeypatch):
 
     result = asyncio.run(crawler._run_creator(creator_b, "collect"))
     assert result["status"] == RunStatus.PARTIAL_SUCCESS_SAFE_STOP.value
-    assert crawler.current_creator_id == creator_b.user_id
+    assert crawler.current_creator_id is None
     assert "66dabcde000000001f01abcd" not in crawler.structured_by_note
 
 
@@ -275,6 +277,8 @@ def test_exact_detail_state_overrides_weaker_response_record():
     assert merged["share_count"] == "3"
     assert merged["tags"] == ["列表", "详情"]
     assert merged["_structured_source"] == "DETAIL_INITIAL_STATE"
+    assert merged["_field_sources"]["title"] == "DETAIL_INITIAL_STATE"
+    assert merged["_field_sources"]["share_count"] == "DETAIL_INITIAL_STATE"
 
 
 def test_later_partial_response_does_not_erase_existing_public_fields(tmp_path: Path):
@@ -301,10 +305,75 @@ def test_later_partial_response_does_not_erase_existing_public_fields(tmp_path: 
     crawler2 = Crawler(app_config(tmp_path), DummyDb(), DummyLogger())
     crawler2.current_run_id = "run"
     crawler2.current_creator_id = "5cfb1f8e00000000100322e4"
-    crawler2._capture_structured("run", "https://www.xiaohongshu.com/api/a", {"id": note_id, "title": "标题"})
-    crawler2._capture_structured("run", "https://www.xiaohongshu.com/api/b", {"id": note_id, "likedCount": "9"})
+    crawler2._capture_structured("run", "https://www.xiaohongshu.com/api/a", {"noteId": note_id, "title": "标题"})
+    crawler2._capture_structured("run", "https://www.xiaohongshu.com/api/b", {"noteId": note_id, "likedCount": "9"})
     assert crawler2.structured_by_note[note_id]["title"] == "标题"
     assert crawler2.structured_by_note[note_id]["liked_count"] == "9"
+
+
+def test_same_payload_note_records_merge_non_destructively():
+    note_id = "66dabcde000000001f01abcd"
+    records = extract_public_note_records(
+        {
+            "items": [
+                {"noteId": note_id, "title": "完整", "likedCount": "11", "shareCount": "2", "tagList": [{"name": "A"}]},
+                {"noteId": note_id, "title": "标题-only"},
+            ]
+        }
+    )
+    assert records[note_id]["title"] == "完整"
+    assert records[note_id]["liked_count"] == "11"
+    assert records[note_id]["share_count"] == "2"
+    assert records[note_id]["tags"] == ["A"]
+
+
+def test_same_payload_note_merge_is_order_independent():
+    note_id = "66dabcde000000001f01abcd"
+    rich = {"noteId": note_id, "title": "完整", "likedCount": "11", "shareCount": "2", "tagList": [{"name": "A"}]}
+    sparse = {"noteId": note_id, "title": "标题-only"}
+    first = extract_public_note_records({"items": [rich, sparse]})[note_id]
+    second = extract_public_note_records({"items": [sparse, rich]})[note_id]
+    assert first["title"] == second["title"] == "完整"
+    assert first["liked_count"] == second["liked_count"] == "11"
+    assert first["share_count"] == second["share_count"] == "2"
+    assert first["tags"] == second["tags"] == ["A"]
+
+
+def test_comment_id_not_classified_as_note():
+    comment_id = "bbbbbbbbbbbbbbbbbbbbbbbb"
+    assert extract_public_note_records({"id": comment_id, "content": "comment body", "time": 123, "likedCount": "3"}) == {}
+
+
+def test_user_id_not_classified_as_note():
+    user_id = "cccccccccccccccccccccccc"
+    assert extract_public_note_records({"id": user_id, "nickname": "user", "desc": "bio"}) == {}
+
+
+def test_explicit_note_id_is_classified():
+    note_id = "66dabcde000000001f01abcd"
+    records = extract_public_note_records({"noteId": note_id, "title": "T"})
+    assert records[note_id]["title"] == "T"
+
+
+def test_generic_id_with_note_schema_is_classified():
+    note_id = "66dabcde000000001f01abcd"
+    records = extract_public_note_records({"id": note_id, "displayTitle": "T", "interactInfo": {"likedCount": "3"}})
+    assert records[note_id]["display_title"] == "T"
+    assert records[note_id]["liked_count"] == "3"
+
+
+def test_structured_note_traversal_is_bounded(tmp_path: Path):
+    crawler = Crawler(app_config(tmp_path), DummyDb(), DummyLogger())
+    crawler.current_run_id = "run"
+    crawler.current_creator_id = "5cfb1f8e00000000100322e4"
+    nested = current = {}
+    for index in range(6000):
+        current["next"] = {}
+        current = current["next"]
+        current["id"] = f"{index:024x}"
+        current["nickname"] = "not-a-note"
+    crawler._capture_structured("run", "https://www.xiaohongshu.com/api/large", nested)
+    assert crawler.structured_by_note == {}
 
 
 def test_profile_partial_response_does_not_erase_existing_fields():
@@ -320,6 +389,48 @@ def test_profile_partial_response_does_not_erase_existing_fields():
     assert merged["bio"] == "公开简介"
     assert merged["ip_location"] == "浙江"
     assert merged["avatar_url"] == "https://img.example/a.jpg"
+
+
+def test_profile_sparse_then_rich_merges():
+    creator_id = "5cfb1f8e00000000100322e4"
+    record = extract_public_profile_record(
+        {
+            "items": [
+                {"userId": creator_id, "nickname": "稀疏"},
+                {"userId": creator_id, "nickname": "完整", "fans": "1.2万", "desc": "公开简介", "ipLocation": "浙江", "tags": [{"name": "A"}]},
+            ]
+        },
+        creator_id,
+    )
+    assert record["nickname"] == "完整"
+    assert record["followers"] == "1.2万"
+    assert record["bio"] == "公开简介"
+    assert record["ip_location"] == "浙江"
+    assert record["tags"] == ["A"]
+
+
+def test_profile_rich_then_sparse_same_result():
+    creator_id = "5cfb1f8e00000000100322e4"
+    rich = {"userId": creator_id, "nickname": "完整", "fans": "1.2万", "desc": "公开简介", "ipLocation": "浙江", "tags": [{"name": "A"}]}
+    sparse = {"userId": creator_id, "nickname": "稀疏"}
+    first = extract_public_profile_record({"items": [sparse, rich]}, creator_id)
+    second = extract_public_profile_record({"items": [rich, sparse]}, creator_id)
+    assert first == second
+    assert first["nickname"] == "完整"
+
+
+def test_profile_different_creator_never_merges():
+    creator_id = "5cfb1f8e00000000100322e4"
+    record = extract_public_profile_record(
+        {
+            "items": [
+                {"userId": "aaaaaaaaaaaaaaaaaaaaaaaa", "nickname": "其他", "fans": "99万"},
+                {"userId": creator_id, "nickname": "目标"},
+            ]
+        },
+        creator_id,
+    )
+    assert record == {"user_id": creator_id, "nickname": "目标"}
 
 
 def test_different_creator_profile_records_never_merge():
@@ -345,6 +456,29 @@ def test_missing_profile_field_reason_is_not_observed():
     assert summary["following"]["present"] is False
     assert summary["following"]["reason"] == "NOT_OBSERVED"
     assert summary["profile_tags"]["reason"] == "NOT_OBSERVED"
+
+
+def test_field_level_structured_provenance():
+    note_id = "66dabcde000000001f01abcd"
+    record = merge_public_note_records(
+        {"note_id": note_id, "title": "T", "liked_count": "1"},
+        {"note_id": note_id, "share_count": "9"},
+        note_id,
+        prefer_incoming=False,
+        incoming_source="PAGE_RESPONSE",
+    )
+    record = merge_public_note_records(record, {"note_id": note_id, "liked_count": "2"}, note_id, prefer_incoming=True, incoming_source="DETAIL_INITIAL_STATE")
+    assert record["_field_sources"]["title"] == "PAGE_RESPONSE"
+    assert record["_field_sources"]["liked_count"] == "DETAIL_INITIAL_STATE"
+    assert record["_field_sources"]["share_count"] == "PAGE_RESPONSE"
+
+
+def test_tag_provenance_merges_deterministically():
+    note_id = "66dabcde000000001f01abcd"
+    record = merge_public_note_records(None, {"note_id": note_id, "tags": ["A"]}, note_id, prefer_incoming=False, incoming_source="PAGE_RESPONSE")
+    record = merge_public_note_records(record, {"note_id": note_id, "tags": ["B"]}, note_id, prefer_incoming=True, incoming_source="DETAIL_INITIAL_STATE")
+    assert record["tags"] == ["A", "B"]
+    assert record["_field_sources"]["tags"] == "PAGE_RESPONSE+DETAIL_INITIAL_STATE"
 
 
 def _checkpoint(tmp_path: Path):
@@ -653,6 +787,37 @@ def test_risk_safe_stop_never_auto_retries(tmp_path: Path, monkeypatch):
     )
     assert result.safe_stop_reason == "RISK_CONTROL_DETECTED"
     assert attempts == 1
+
+
+def test_completed_run_ignores_late_structured_callback(tmp_path: Path, monkeypatch):
+    db = DummyDb()
+    crawler = Crawler(app_config(tmp_path), db, DummyLogger())
+    note_id = "66dabcde000000001f01abcd"
+
+    async def fake_profile(*args, **kwargs):
+        return {"captured_at": "now", "nickname": "n", "canonical_url": app_config(tmp_path).creators[0].url, "source": "test"}
+
+    async def fake_discover(*args, **kwargs):
+        return []
+
+    async def fake_collect(*args, **kwargs):
+        return CollectionResult()
+
+    monkeypatch.setattr(crawler_module, "BrowserSession", FakeBrowserSession)
+    monkeypatch.setattr(crawler_module, "extract_profile_dom", fake_profile)
+    monkeypatch.setattr(crawler, "_extract_initial_state_profile_record", lambda *args, **kwargs: _return_async(None))
+    monkeypatch.setattr(crawler, "_discover_notes", fake_discover)
+    monkeypatch.setattr(crawler, "_collect_notes", fake_collect)
+    monkeypatch.setattr(crawler_module, "run_offline_qa", lambda *args, **kwargs: {"passed": True})
+    monkeypatch.setattr(crawler_module, "export_excel", lambda *args, **kwargs: tmp_path / "out.xlsx")
+
+    result = asyncio.run(crawler._run_creator(app_config(tmp_path).creators[0], "collect"))
+    assert result["status"] == RunStatus.PARTIAL_SUCCESS_SAFE_STOP.value
+    crawler._capture_structured("stale-run", "https://www.xiaohongshu.com/api/a", {"noteId": note_id, "title": "late"})
+    assert crawler.current_run_id is None
+    assert crawler.current_creator_id is None
+    assert crawler.structured_by_note == {}
+    assert crawler.structured_profile is None
 
 
 def test_extract_initial_state_note_record_uses_exact_note_detail_map(tmp_path: Path):

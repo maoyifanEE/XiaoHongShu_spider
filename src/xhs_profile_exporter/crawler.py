@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+from collections import deque
 import json
 import logging
 import random
@@ -31,6 +32,11 @@ from .runtime import CollectionResult, OpenNoteResult, RunBudget, SafeStopReques
 from .state import LoginStatus, RunStatus
 from .time_utils import now_iso
 from .utils import is_sensitive_key, parse_count, sanitize_json, sanitize_url
+
+
+MAX_STRUCTURED_NODES_PER_RESPONSE = 5000
+NOTE_ID_LENGTH = 24
+STRUCTURED_SOURCE_PRIORITY = {"PAGE_RESPONSE": 1, "DETAIL_INITIAL_STATE": 2}
 
 
 class Crawler:
@@ -78,7 +84,10 @@ class Crawler:
         budget = self._build_budget()
 
         if mode == "login-only":
-            return await self._login_only(creator, user_id, run_id)
+            try:
+                return await self._login_only(creator, user_id, run_id)
+            finally:
+                self._clear_run_context(run_id, user_id)
 
         try:
             async with BrowserSession(self.app_config.base_dir, self.app_config.raw, self.logger) as browser:
@@ -238,6 +247,8 @@ class Crawler:
             self.logger.exception("RUN failed run_id=%s error_type=%s", run_id, type(exc).__name__)
             self.db.finish_run(run_id, RunStatus.FAILED.value, safe_stop_reason=type(exc).__name__)
             raise
+        finally:
+            self._clear_run_context(run_id, user_id)
 
     async def _login_only(self, creator: CreatorConfig, user_id: str, run_id: str) -> dict[str, Any]:
         async with BrowserSession(self.app_config.base_dir, self.app_config.raw, self.logger) as browser:
@@ -860,7 +871,9 @@ class Crawler:
         if run_id != self.current_run_id:
             self.logger.info("STRUCTURED_RESPONSE ignored_stale run_id=%s current_run_id=%s", run_id, self.current_run_id)
             return
-        records = extract_public_note_records(data)
+        records, note_limit_reached = extract_public_note_records_with_stats(data)
+        if note_limit_reached:
+            self.logger.info("STRUCTURED_RESPONSE traversal_limit_reached nodes=%s", MAX_STRUCTURED_NODES_PER_RESPONSE)
         for note_id, record in records.items():
             self.structured_by_note[note_id] = merge_public_note_records(
                 self.structured_by_note.get(note_id),
@@ -870,7 +883,9 @@ class Crawler:
                 incoming_source="PAGE_RESPONSE",
             )
         profile_before = self.structured_profile is not None
-        profile_record = extract_public_profile_record(data, self.current_creator_id) if self.current_creator_id else None
+        profile_record, profile_limit_reached = extract_public_profile_record_with_stats(data, self.current_creator_id) if self.current_creator_id else (None, False)
+        if profile_limit_reached:
+            self.logger.info("STRUCTURED_RESPONSE profile_traversal_limit_reached nodes=%s", MAX_STRUCTURED_NODES_PER_RESPONSE)
         if profile_record:
             self.structured_profile = merge_public_profile_records(
                 self.structured_profile,
@@ -880,6 +895,14 @@ class Crawler:
             )
         if records or (self.structured_profile is not None and not profile_before):
             self.logger.info("STRUCTURED_RESPONSE run_id=%s extracted_note_records=%s profile_associated=%s", run_id, len(records), bool(self.structured_profile))
+
+    def _clear_run_context(self, run_id: str, creator_id: str) -> None:
+        if self.current_run_id == run_id:
+            self.current_run_id = None
+            self.current_creator_id = None
+            self.structured_by_note = {}
+            self.structured_profile = None
+            self.logger.info("STRUCTURED_STATE cleared run_id=%s creator_id=%s", run_id, creator_id)
 
     def _write_raw(self, entity_type: str, entity_id: str, run_id: str, data: Any) -> None:
         raw_dir = self.app_config.base_dir / "data" / "raw" / ("profile" if entity_type == "profile" else "notes")
@@ -1023,6 +1046,35 @@ NOTE_PUBLIC_RECORD_KEYS = {
     "share_count",
     "tags",
     "_structured_source",
+    "_field_sources",
+}
+
+NOTE_PUBLIC_BUSINESS_KEYS = {
+    "title",
+    "display_title",
+    "desc",
+    "content",
+    "type",
+    "note_type",
+    "model_type",
+    "time",
+    "publish_time",
+    "liked_count",
+    "collected_count",
+    "comment_count",
+    "share_count",
+    "tags",
+}
+
+NOTE_SCHEMA_EVIDENCE_KEYS = {
+    "interactInfo",
+    "tagList",
+    "displayTitle",
+    "display_title",
+    "noteType",
+    "note_type",
+    "modelType",
+    "model_type",
 }
 
 PROFILE_PUBLIC_RECORD_KEYS = {
@@ -1052,34 +1104,48 @@ def merge_public_note_records(
     normalized_existing = normalize_public_note_record(existing or {}, note_id) if existing else None
     normalized_incoming = normalize_public_note_record(incoming or {}, note_id) if incoming else None
     existing_source = (existing or {}).get("_structured_source")
+    existing_field_sources = _normalize_structured_field_sources((existing or {}).get("_field_sources"))
     if not normalized_existing and not normalized_incoming:
-        return {"note_id": note_id, "_structured_source": incoming_source}
+        return {"note_id": note_id, "_structured_source": incoming_source, "_field_sources": {}}
     if not normalized_existing:
         merged = _allowlisted_note_record(normalized_incoming or {"note_id": note_id})
         merged["_structured_source"] = incoming_source
+        merged["_field_sources"] = _field_sources_for_record(merged, incoming_source)
         return merged
     if not normalized_incoming:
         merged = _allowlisted_note_record(normalized_existing)
         if existing_source:
             merged["_structured_source"] = existing_source
+        merged["_field_sources"] = existing_field_sources
         return merged
 
     if normalized_incoming.get("note_id") != normalized_existing.get("note_id"):
         raise ValueError(f"structured note_id mismatch: {normalized_existing.get('note_id')} != {normalized_incoming.get('note_id')}")
 
     merged = _allowlisted_note_record(normalized_existing)
+    field_sources = dict(existing_field_sources) or _field_sources_for_record(merged, str(existing_source or incoming_source))
+    existing_score = _public_note_completeness_score(normalized_existing)
+    incoming_score = _public_note_completeness_score(normalized_incoming)
+    incoming_can_replace_conflicts = prefer_incoming or incoming_score > existing_score
     for key, value in _allowlisted_note_record(normalized_incoming).items():
         if key in {"id", "note_id", "_structured_source"}:
             continue
+        if key == "_field_sources":
+            continue
         if key == "tags":
+            before = merged.get("tags") or []
             merged["tags"] = merge_tags(merged.get("tags") or [], value or [])
+            if merged.get("tags") != before:
+                field_sources["tags"] = _merge_source_labels(field_sources.get("tags"), incoming_source)
             continue
         if not field_value_present(value):
             continue
-        if prefer_incoming or not field_value_present(merged.get(key)):
+        if not field_value_present(merged.get(key)) or incoming_can_replace_conflicts:
             merged[key] = value
+            field_sources[key] = incoming_source
     merged = normalize_public_note_record(merged, note_id) or {"note_id": note_id}
     merged["_structured_source"] = _merged_structured_source(existing_source, incoming_source, prefer_incoming)
+    merged["_field_sources"] = _normalize_structured_field_sources(field_sources)
     return _allowlisted_note_record(merged)
 
 
@@ -1101,6 +1167,9 @@ def merge_public_profile_records(
         return normalized_existing
 
     merged = dict(normalized_existing)
+    existing_score = _public_profile_completeness_score(normalized_existing)
+    incoming_score = _public_profile_completeness_score(normalized_incoming)
+    incoming_can_replace_conflicts = prefer_incoming or incoming_score > existing_score
     for key, value in normalized_incoming.items():
         if key == "user_id":
             continue
@@ -1109,13 +1178,18 @@ def merge_public_profile_records(
             continue
         if not field_value_present(value):
             continue
-        if prefer_incoming or not field_value_present(merged.get(key)):
+        if incoming_can_replace_conflicts or not field_value_present(merged.get(key)):
             merged[key] = value
     return _allowlisted_profile_record(merged, creator_id)
 
 
 def _allowlisted_note_record(record: dict[str, Any]) -> dict[str, Any]:
-    return {key: value for key, value in record.items() if key in NOTE_PUBLIC_RECORD_KEYS and field_value_present(value)}
+    clean = {}
+    for key, value in record.items():
+        if key not in NOTE_PUBLIC_RECORD_KEYS or not field_value_present(value):
+            continue
+        clean[key] = _normalize_structured_field_sources(value) if key == "_field_sources" else value
+    return clean
 
 
 def _allowlisted_profile_record(record: dict[str, Any] | None, creator_id: str) -> dict[str, Any] | None:
@@ -1132,6 +1206,40 @@ def _merged_structured_source(existing_source: Any, incoming_source: str, prefer
     if existing_source == "DETAIL_INITIAL_STATE":
         return "DETAIL_INITIAL_STATE"
     return incoming_source if not existing_source else str(existing_source)
+
+
+def _field_sources_for_record(record: dict[str, Any], source: str) -> dict[str, str]:
+    return {key: source for key in NOTE_PUBLIC_BUSINESS_KEYS if field_value_present(record.get(key))}
+
+
+def _normalize_structured_field_sources(value: Any) -> dict[str, str]:
+    if not isinstance(value, dict):
+        return {}
+    result = {}
+    for key, source in value.items():
+        if key not in NOTE_PUBLIC_BUSINESS_KEYS:
+            continue
+        result[key] = _normalize_source_label(source)
+    return result
+
+
+def _normalize_source_label(source: Any) -> str:
+    parts = [part for part in str(source or "").split("+") if part in STRUCTURED_SOURCE_PRIORITY]
+    if not parts:
+        return "PAGE_RESPONSE"
+    return "+".join(sorted(set(parts), key=lambda item: STRUCTURED_SOURCE_PRIORITY[item]))
+
+
+def _merge_source_labels(existing: Any, incoming: str) -> str:
+    return _normalize_source_label("+".join([str(existing or ""), incoming]))
+
+
+def _public_note_completeness_score(record: dict[str, Any]) -> int:
+    return sum(1 for key in NOTE_PUBLIC_BUSINESS_KEYS if field_value_present(record.get(key)))
+
+
+def _public_profile_completeness_score(record: dict[str, Any]) -> int:
+    return sum(1 for key in PROFILE_PUBLIC_RECORD_KEYS if key != "user_id" and field_value_present(record.get(key)))
 
 
 def is_visible_note_cover_summary(summary: dict[str, Any]) -> bool:
@@ -1228,51 +1336,123 @@ PROFILE_PUBLIC_FIELD_ALIASES = {
     "tags": "tags",
 }
 
+STRUCTURED_TRAVERSAL_LIMIT = object()
+
+
+def _bounded_walk(value: Any):
+    queue = deque([value])
+    seen: set[int] = set()
+    nodes = 0
+    while queue:
+        if nodes >= MAX_STRUCTURED_NODES_PER_RESPONSE:
+            yield STRUCTURED_TRAVERSAL_LIMIT
+            return
+        node = queue.popleft()
+        if isinstance(node, (dict, list)):
+            object_id = id(node)
+            if object_id in seen:
+                continue
+            seen.add(object_id)
+        nodes += 1
+        yield node
+        if isinstance(node, dict):
+            queue.extend(node.values())
+        elif isinstance(node, list):
+            queue.extend(node)
+
+
+def _note_candidate_id(value: dict[str, Any]) -> str | None:
+    explicit_id = value.get("note_id") or value.get("noteId")
+    if _is_valid_public_id(explicit_id):
+        return str(explicit_id)
+    generic_id = value.get("id")
+    if _is_valid_public_id(generic_id) and _has_note_schema_evidence(value):
+        return str(generic_id)
+    return None
+
+
+def _is_valid_public_id(value: Any) -> bool:
+    return isinstance(value, str) and len(value) == NOTE_ID_LENGTH
+
+
+def _has_note_schema_evidence(value: dict[str, Any]) -> bool:
+    return any(key in value for key in NOTE_SCHEMA_EVIDENCE_KEYS)
+
+
+def _normalize_public_profile_candidate(value: dict[str, Any], creator_id: str) -> dict[str, Any] | None:
+    candidate_id = value.get("user_id") or value.get("userId") or value.get("id")
+    if candidate_id != creator_id:
+        return None
+    record: dict[str, Any] = {"user_id": creator_id}
+    for key, out_key in PROFILE_PUBLIC_FIELD_ALIASES.items():
+        if key not in value or is_sensitive_key(key):
+            continue
+        item = value.get(key)
+        if isinstance(item, (dict, list)) and out_key != "tags":
+            continue
+        if out_key == "avatar_url":
+            record[out_key] = sanitize_url(str(item)) if item else None
+        elif out_key == "tags":
+            record[out_key] = normalize_profile_tags(item)
+        else:
+            record[out_key] = sanitize_json(item)
+    return _allowlisted_profile_record(record, creator_id)
+
 
 def extract_public_note_records(value: Any) -> dict[str, dict[str, Any]]:
-    records: dict[str, dict[str, Any]] = {}
-    if isinstance(value, dict):
-        note_id = value.get("note_id") or value.get("id") or value.get("noteId")
-        if isinstance(note_id, str) and len(note_id) == 24:
-            record = normalize_public_note_record(value, note_id)
-            if record:
-                records[note_id] = sanitize_json(record)
-        for item in value.values():
-            records.update(extract_public_note_records(item))
-    elif isinstance(value, list):
-        for item in value:
-            records.update(extract_public_note_records(item))
+    records, _ = extract_public_note_records_with_stats(value)
     return records
 
 
+def extract_public_note_records_with_stats(value: Any) -> tuple[dict[str, dict[str, Any]], bool]:
+    records: dict[str, dict[str, Any]] = {}
+    limit_reached = False
+    for node in _bounded_walk(value):
+        if node is STRUCTURED_TRAVERSAL_LIMIT:
+            limit_reached = True
+            break
+        if not isinstance(node, dict):
+            continue
+        note_id = _note_candidate_id(node)
+        if not note_id:
+            continue
+        record = normalize_public_note_record(node, note_id)
+        if not record:
+            continue
+        records[note_id] = merge_public_note_records(
+            records.get(note_id),
+            sanitize_json(record),
+            note_id,
+            prefer_incoming=False,
+            incoming_source="PAGE_RESPONSE",
+        )
+    return records, limit_reached
+
+
 def extract_public_profile_record(value: Any, creator_id: str) -> dict[str, Any] | None:
-    if isinstance(value, dict):
-        candidate_id = value.get("user_id") or value.get("userId") or value.get("id")
-        if candidate_id == creator_id:
-            record: dict[str, Any] = {"user_id": creator_id}
-            for key, out_key in PROFILE_PUBLIC_FIELD_ALIASES.items():
-                if key not in value or is_sensitive_key(key):
-                    continue
-                item = value.get(key)
-                if isinstance(item, (dict, list)) and out_key != "tags":
-                    continue
-                if out_key == "avatar_url":
-                    record[out_key] = sanitize_url(str(item)) if item else None
-                elif out_key == "tags":
-                    record[out_key] = normalize_profile_tags(item)
-                else:
-                    record[out_key] = sanitize_json(item)
-            return {key: item for key, item in record.items() if item is not None}
-        for item in value.values():
-            found = extract_public_profile_record(item, creator_id)
-            if found:
-                return found
-    elif isinstance(value, list):
-        for item in value:
-            found = extract_public_profile_record(item, creator_id)
-            if found:
-                return found
-    return None
+    record, _ = extract_public_profile_record_with_stats(value, creator_id)
+    return record
+
+
+def extract_public_profile_record_with_stats(value: Any, creator_id: str) -> tuple[dict[str, Any] | None, bool]:
+    merged: dict[str, Any] | None = None
+    limit_reached = False
+    for node in _bounded_walk(value):
+        if node is STRUCTURED_TRAVERSAL_LIMIT:
+            limit_reached = True
+            break
+        if not isinstance(node, dict):
+            continue
+        record = _normalize_public_profile_candidate(node, creator_id)
+        if not record:
+            continue
+        merged = merge_public_profile_records(
+            merged,
+            record,
+            creator_id,
+            prefer_incoming=False,
+        )
+    return merged, limit_reached
 
 
 def is_public_profile_payload(value: Any, creator_id: str) -> bool:

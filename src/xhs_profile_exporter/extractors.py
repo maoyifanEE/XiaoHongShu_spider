@@ -250,7 +250,9 @@ async def extract_note_dom(page: Any, note_id: str, top_n: int = 3) -> dict[str,
 def merge_note_with_structured(note: dict[str, Any], structured: dict[str, Any] | None) -> dict[str, Any]:
     if not structured:
         return note
+    original_field_sources = structured.get("_field_sources") if isinstance(structured.get("_field_sources"), dict) else {}
     structured = normalize_public_note_record(structured, note["note_id"]) or structured
+    structured_field_sources = original_field_sources
     field_sources = dict(note.get("field_sources") or {})
     candidates = _find_dicts_with_note_id(structured, note["note_id"])
     for item in candidates:
@@ -258,14 +260,14 @@ def merge_note_with_structured(note: dict[str, Any], structured: dict[str, Any] 
         desc = item.get("desc") or item.get("content")
         if not note.get("title") and title:
             note["title"] = title
-            field_sources["title"] = "INITIAL_STATE"
+            field_sources["title"] = _structured_field_source(structured_field_sources, "title")
         if not note.get("body") and desc:
             note["body"] = desc
-            field_sources["body"] = "INITIAL_STATE"
+            field_sources["body"] = _structured_field_source(structured_field_sources, "desc")
         structured_type = _structured_note_type(item)
         if not note.get("note_type") and structured_type:
             note["note_type"] = structured_type
-            field_sources["note_type"] = "INITIAL_STATE"
+            field_sources["note_type"] = _structured_field_source(structured_field_sources, "note_type")
         for key, out in [
             ("liked_count", "likes"),
             ("collected_count", "collects"),
@@ -281,7 +283,7 @@ def merge_note_with_structured(note: dict[str, Any], structured: dict[str, Any] 
                 note[f"{out}_value"] = state_value
                 note[f"{out}_raw"] = state_raw
                 note[f"{out}_is_exact"] = state_exact
-                field_sources[_metric_field_name(out)] = "INITIAL_STATE"
+                field_sources[_metric_field_name(out)] = _structured_field_source(structured_field_sources, key)
             elif state_value is not None and current_value != state_value:
                 note.setdefault("raw_json", {}).setdefault("metric_source_mismatch", []).append(
                     {"field": _metric_field_name(out), "dom_value": current_value, "state_value": state_value}
@@ -289,20 +291,25 @@ def merge_note_with_structured(note: dict[str, Any], structured: dict[str, Any] 
                 if state_exact is True and current_exact is not True:
                     note[f"{out}_value"] = state_value
                     note[f"{out}_is_exact"] = True
-                    field_sources[_metric_field_name(out)] = "INITIAL_STATE"
+                    field_sources[_metric_field_name(out)] = _structured_field_source(structured_field_sources, key)
         publish_value = item.get("publish_time") or item.get("time")
         if publish_value is not None and not note.get("publish_time"):
             note["publish_time"], note["publish_time_raw"] = normalize_publish_time_value(publish_value)
-            field_sources["publish_time"] = "INITIAL_STATE"
+            field_sources["publish_time"] = _structured_field_source(structured_field_sources, "publish_time")
         if item.get("tags"):
             before_tags = note.get("hashtags") or []
             merged_tags = merge_tags(note.get("hashtags") or [], item.get("tags") or [])
             if merged_tags != before_tags:
                 note["hashtags"] = merged_tags
-                field_sources["tags"] = "INITIAL_STATE" if not before_tags else "DOM_EXACT+INITIAL_STATE"
+                structured_tag_source = _structured_field_source(structured_field_sources, "tags")
+                field_sources["tags"] = structured_tag_source if not before_tags else f"DOM_EXACT+{structured_tag_source}"
         break
     note["field_sources"] = _normalize_note_field_sources(note, field_sources)
     return note
+
+
+def _structured_field_source(field_sources: dict[str, Any], key: str) -> str:
+    return str(field_sources.get(key) or "INITIAL_STATE")
 
 
 def _find_dicts_with_note_id(value: Any, note_id: str) -> list[dict[str, Any]]:

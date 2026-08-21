@@ -8,6 +8,7 @@ import xhs_profile_exporter.crawler as crawler_module
 from xhs_profile_exporter.config import AppConfig, CreatorConfig
 from xhs_profile_exporter.crawler import (
     Crawler,
+    _normalize_structured_field_sources,
     determine_run_status,
     extract_public_note_records,
     extract_public_profile_record,
@@ -516,6 +517,85 @@ def test_field_level_structured_provenance():
     assert record["_field_sources"]["title"] == "PAGE_RESPONSE"
     assert record["_field_sources"]["like_count"] == "DETAIL_INITIAL_STATE"
     assert record["_field_sources"]["share_count"] == "PAGE_RESPONSE"
+
+
+def test_weaker_page_response_cannot_override_detail_initial_state():
+    note_id = "66dabcde000000001f01abcd"
+    record = merge_public_note_records(
+        None,
+        {"note_id": note_id, "title": "detail-title", "liked_count": "100"},
+        note_id,
+        prefer_incoming=True,
+        incoming_source="DETAIL_INITIAL_STATE",
+    )
+    record = merge_public_note_records(
+        record,
+        {"note_id": note_id, "title": "page-title", "liked_count": "99", "share_count": "3", "tags": ["A"]},
+        note_id,
+        prefer_incoming=False,
+        incoming_source="PAGE_RESPONSE",
+    )
+    assert record["title"] == "detail-title"
+    assert record["liked_count"] == "100"
+    assert record["share_count"] == "3"
+    assert record["tags"] == ["A"]
+    assert record["_field_sources"]["title"] == "DETAIL_INITIAL_STATE"
+    assert record["_field_sources"]["like_count"] == "DETAIL_INITIAL_STATE"
+    assert record["_field_sources"]["share_count"] == "PAGE_RESPONSE"
+
+
+def test_stronger_detail_initial_state_overrides_page_response():
+    note_id = "66dabcde000000001f01abcd"
+    record = merge_public_note_records(
+        None,
+        {"note_id": note_id, "title": "page-title", "liked_count": "90", "share_count": "3"},
+        note_id,
+        prefer_incoming=False,
+        incoming_source="PAGE_RESPONSE",
+    )
+    record = merge_public_note_records(
+        record,
+        {"note_id": note_id, "title": "detail-title", "liked_count": "100"},
+        note_id,
+        prefer_incoming=True,
+        incoming_source="DETAIL_INITIAL_STATE",
+    )
+    assert record["title"] == "detail-title"
+    assert record["liked_count"] == "100"
+    assert record["share_count"] == "3"
+    assert record["_field_sources"]["title"] == "DETAIL_INITIAL_STATE"
+    assert record["_field_sources"]["like_count"] == "DETAIL_INITIAL_STATE"
+    assert record["_field_sources"]["share_count"] == "PAGE_RESPONSE"
+
+
+def test_structured_field_source_normalization_is_idempotent():
+    sources = {
+        "title": "DETAIL_INITIAL_STATE",
+        "body": "PAGE_RESPONSE",
+        "note_type": "PAGE_RESPONSE",
+        "publish_time": "DETAIL_INITIAL_STATE",
+        "like_count": "PAGE_RESPONSE",
+        "collect_count": "PAGE_RESPONSE",
+        "comment_count": "PAGE_RESPONSE",
+        "share_count": "PAGE_RESPONSE",
+        "tags": "PAGE_RESPONSE+DETAIL_INITIAL_STATE",
+    }
+    once = _normalize_structured_field_sources(sources)
+    twice = _normalize_structured_field_sources(once)
+    assert once == twice == sources
+
+
+def test_body_provenance_survives_multiple_merges():
+    note_id = "66dabcde000000001f01abcd"
+    record = merge_public_note_records(None, {"note_id": note_id, "content": "正文"}, note_id, prefer_incoming=False, incoming_source="PAGE_RESPONSE")
+    assert record["content"] == "正文"
+    assert record["_field_sources"]["body"] == "PAGE_RESPONSE"
+    record = merge_public_note_records(record, {"note_id": note_id, "share_count": "3"}, note_id, prefer_incoming=False, incoming_source="PAGE_RESPONSE")
+    assert record["content"] == "正文"
+    assert record["_field_sources"]["body"] == "PAGE_RESPONSE"
+    record = merge_public_note_records(record, {"note_id": note_id, "desc": "详情正文"}, note_id, prefer_incoming=True, incoming_source="DETAIL_INITIAL_STATE")
+    assert record["desc"] == "详情正文"
+    assert record["_field_sources"]["body"] == "DETAIL_INITIAL_STATE"
 
 
 def test_tag_provenance_merges_deterministically():

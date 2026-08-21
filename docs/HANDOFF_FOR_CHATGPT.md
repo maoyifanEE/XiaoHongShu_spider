@@ -1462,3 +1462,84 @@ pytest: 112 passed in 38.90s
 git diff --check: passed, only Windows LF/CRLF warnings
 qa-only: passed=True
 ```
+
+## Structured Source Priority Finalization - 2026-08-20
+
+Baseline:
+
+```text
+a056aa0813ba08bec83c78a1053f756cdaf05aa6
+Prevent XHS relation IDs from polluting notes
+```
+
+Known live state remains unchanged:
+
+```text
+12 notes successfully completed and exported
+candidate 13 detected RISK_CONTROL_DETECTED
+crawler safely stopped
+NO automatic retry was performed
+```
+
+This round was offline only:
+
+```text
+NO LIVE XHS TEST THIS ROUND
+No --mode smoke / collect / login-only / navigation-probe was run.
+No browser was opened against a real XHS page.
+COMMENTS CONTENT = NOT IMPLEMENTED
+FULL 136 = NOT EXECUTED
+```
+
+Fixes made:
+
+```text
+- structured field conflict handling now uses field-level source priority.
+- PAGE_RESPONSE can no longer override existing DETAIL_INITIAL_STATE field values just because the incoming record is more complete.
+- DETAIL_INITIAL_STATE still overrides weaker PAGE_RESPONSE fields.
+- same-source PAGE_RESPONSE richer merge remains deterministic.
+- mixed labels such as PAGE_RESPONSE+DETAIL_INITIAL_STATE resolve to the strongest contained priority.
+- canonical provenance normalization now accepts canonical keys and is idempotent.
+- body provenance survives repeated merges and can later be upgraded by stronger DETAIL_INITIAL_STATE data.
+```
+
+Validation:
+
+```powershell
+$env:PLAYWRIGHT_BROWSERS_PATH="$PWD\.ms-playwright"
+$env:PYTHONIOENCODING="utf-8"
+.\.venv\Scripts\python.exe -m pytest tests\test_crawler_navigation.py tests\test_security_sanitization.py tests\test_extractors_dom.py -q
+```
+
+Result:
+
+```text
+80 passed in 41.99s
+```
+
+Full offline validation:
+
+```powershell
+$env:PLAYWRIGHT_BROWSERS_PATH="$PWD\.ms-playwright"
+$env:PYTHONIOENCODING="utf-8"
+.\.venv\Scripts\python.exe -m pytest -q
+git diff --check
+.\.venv\Scripts\python.exe -m xhs_profile_exporter --mode qa-only
+```
+
+Results:
+
+```text
+pytest: 116 passed in 30.82s
+git diff --check: passed, only Windows LF/CRLF warnings
+qa-only: passed=True
+```
+
+Security/log review:
+
+```text
+No live XHS mode was run.
+No cookie import, token replay, direct URL replay, stealth, proxy, or CAPTCHA/risk-control bypass was added.
+No full payload dump or auth header/cookie/token persistence was added.
+Structured skip logging records sanitized URL path only.
+```

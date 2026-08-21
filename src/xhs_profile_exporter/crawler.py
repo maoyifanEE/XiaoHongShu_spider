@@ -1194,7 +1194,7 @@ def merge_public_note_records(
     field_sources = dict(existing_field_sources) or _field_sources_for_record(merged, str(existing_source or incoming_source))
     existing_score = _public_note_completeness_score(normalized_existing)
     incoming_score = _public_note_completeness_score(normalized_incoming)
-    incoming_can_replace_conflicts = prefer_incoming or incoming_score > existing_score
+    same_source_richer = incoming_score > existing_score
     for key, value in _allowlisted_note_record(normalized_incoming).items():
         if key in {"id", "note_id", "_structured_source"}:
             continue
@@ -1208,9 +1208,17 @@ def merge_public_note_records(
             continue
         if not field_value_present(value):
             continue
-        if not field_value_present(merged.get(key)) or incoming_can_replace_conflicts:
+        canonical_field = STRUCTURED_FIELD_ALIASES.get(key, key)
+        if _should_replace_structured_field(
+            field_sources.get(canonical_field),
+            incoming_source,
+            prefer_incoming=prefer_incoming,
+            existing_value=merged.get(key),
+            incoming_value=value,
+            same_source_richer=same_source_richer,
+        ):
             merged[key] = value
-            field_sources[STRUCTURED_FIELD_ALIASES.get(key, key)] = incoming_source
+            field_sources[canonical_field] = incoming_source
     merged = normalize_public_note_record(merged, note_id) or {"note_id": note_id}
     merged["_structured_source"] = _merged_structured_source(existing_source, incoming_source, prefer_incoming)
     merged["_field_sources"] = _normalize_structured_field_sources(field_sources)
@@ -1289,7 +1297,8 @@ def _normalize_structured_field_sources(value: Any) -> dict[str, str]:
         return {}
     result = {}
     for key, source in value.items():
-        canonical = STRUCTURED_FIELD_ALIASES.get(str(key))
+        key_text = str(key)
+        canonical = key_text if key_text in STRUCTURED_CANONICAL_FIELDS else STRUCTURED_FIELD_ALIASES.get(key_text)
         if canonical not in STRUCTURED_CANONICAL_FIELDS:
             continue
         result[canonical] = _merge_source_labels(result.get(canonical), _normalize_source_label(source))
@@ -1305,6 +1314,32 @@ def _normalize_source_label(source: Any) -> str:
 
 def _merge_source_labels(existing: Any, incoming: str) -> str:
     return _normalize_source_label("+".join([str(existing or ""), incoming]))
+
+
+def _structured_source_priority(label: Any) -> int:
+    return max((STRUCTURED_SOURCE_PRIORITY.get(part, 0) for part in str(label or "").split("+")), default=0)
+
+
+def _should_replace_structured_field(
+    existing_source: Any,
+    incoming_source: str,
+    *,
+    prefer_incoming: bool,
+    existing_value: Any,
+    incoming_value: Any,
+    same_source_richer: bool,
+) -> bool:
+    if not field_value_present(incoming_value):
+        return False
+    if not field_value_present(existing_value):
+        return True
+    incoming_priority = _structured_source_priority(incoming_source)
+    existing_priority = _structured_source_priority(existing_source)
+    if incoming_priority > existing_priority:
+        return True
+    if incoming_priority < existing_priority:
+        return False
+    return prefer_incoming or same_source_richer
 
 
 def _public_note_completeness_score(record: dict[str, Any]) -> int:

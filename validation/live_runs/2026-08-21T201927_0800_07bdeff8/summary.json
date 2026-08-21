@@ -1,0 +1,70 @@
+{
+  "run_id": "2026-08-21T201927_0800_07bdeff8",
+  "status": "SUCCESS",
+  "login_status": "LOGIN_OK",
+  "notes_discovered": 5,
+  "attempted": 5,
+  "target_verified": 5,
+  "exportable": 5,
+  "navigation_failed": 0,
+  "detail_not_ready": 0,
+  "safe_stop_reason": null,
+  "fields": {
+    "title": {
+      "value_present": 5,
+      "source": {
+        "DOM_EXACT": 5
+      }
+    },
+    "body": {
+      "value_present": 5,
+      "source": {
+        "DOM_EXACT": 5
+      }
+    },
+    "note_type": {
+      "value_present": 5,
+      "source": {
+        "DOM_EXACT": 5
+      }
+    },
+    "publish_time": {
+      "value_present": 5,
+      "source": {
+        "DOM_EXACT": 5
+      }
+    },
+    "like_count": {
+      "value_present": 5,
+      "source": {
+        "DOM_EXACT": 5
+      }
+    },
+    "collect_count": {
+      "value_present": 5,
+      "source": {
+        "DOM_EXACT": 5
+      }
+    },
+    "comment_count": {
+      "value_present": 4,
+      "source": {
+        "DOM_EXACT": 4,
+        "MISSING": 1
+      }
+    },
+    "share_count": {
+      "value_present": 2,
+      "source": {
+        "DETAIL_INITIAL_STATE": 2,
+        "MISSING": 3
+      }
+    },
+    "tags": {
+      "value_present": 5,
+      "source": {
+        "DOM_EXACT": 5
+      }
+    }
+  }
+}

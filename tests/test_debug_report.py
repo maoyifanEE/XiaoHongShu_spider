@@ -57,6 +57,11 @@ def test_debug_extract_report_schema(tmp_path: Path):
         "tags",
     }
     assert saved["fields"]["title"]["source"] == "DOM_EXACT"
+    assert saved["fields"]["title"]["dom_evidence_preview"] == "标题"
+    for field in saved["fields"].values():
+        assert "value" in field
+        assert "source" in field
+        assert "dom_evidence_preview" in field
     assert saved["fields"]["share_count"]["source"] == "DETAIL_INITIAL_STATE"
     assert saved["fields"]["share_count"]["confidence"] == "high"
     assert saved["dom_summary"]["selectors_checked"] == ["#detail-title", "#detail-desc"]

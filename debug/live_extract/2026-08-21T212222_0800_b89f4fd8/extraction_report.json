@@ -1,0 +1,130 @@
+{
+  "run_id": "2026-08-21T212222_0800_b89f4fd8",
+  "note_id": "6a7b27e9000000003400c518",
+  "detail_ready": true,
+  "status": "OK",
+  "fields": {
+    "title": {
+      "value": "不来姨妈！别总怀疑得了多囊",
+      "source": "DOM_EXACT",
+      "confidence": "high",
+      "dom_evidence_preview": "不来姨妈！别总怀疑得了多囊"
+    },
+    "body": {
+      "value": "#愿世界没有痛经 #内分泌平衡 #多囊",
+      "source": "DOM_EXACT",
+      "confidence": "high",
+      "dom_evidence_preview": "#愿世界没有痛经 #内分泌平衡 #多囊"
+    },
+    "note_type": {
+      "value": "视频",
+      "source": "DOM_EXACT",
+      "confidence": "high",
+      "dom_evidence_preview": null
+    },
+    "publish_time": {
+      "value": "08-11",
+      "source": "DOM_EXACT",
+      "confidence": "high",
+      "dom_evidence_preview": null
+    },
+    "like_count": {
+      "value": 5,
+      "source": "DOM_EXACT",
+      "confidence": "high",
+      "dom_evidence_preview": "5"
+    },
+    "collect_count": {
+      "value": 1,
+      "source": "DOM_EXACT",
+      "confidence": "high",
+      "dom_evidence_preview": "1"
+    },
+    "comment_count": {
+      "value": null,
+      "source": "MISSING",
+      "confidence": "missing",
+      "dom_evidence_preview": "评论",
+      "reason": "not_observed"
+    },
+    "share_count": {
+      "value": null,
+      "source": "MISSING",
+      "confidence": "missing",
+      "dom_evidence_preview": null,
+      "reason": "not_observed"
+    },
+    "tags": {
+      "value": [
+        "内分泌平衡",
+        "多囊",
+        "愿世界没有痛经"
+      ],
+      "source": "DOM_EXACT",
+      "confidence": "high",
+      "dom_evidence_preview": "#愿世界没有痛经"
+    }
+  },
+  "dom_summary": {
+    "selectors_checked": [
+      "#detail-title",
+      "#detail-desc",
+      ".engage-bar .like-wrapper",
+      ".engage-bar .collect-wrapper",
+      ".engage-bar .chat-wrapper",
+      ".engage-bar .share-wrapper",
+      "#detail-desc a[href*=\"search\"]",
+      "a[href*=\"/search\"]"
+    ],
+    "matched_nodes": [
+      {
+        "selector": "#detail-title",
+        "text_preview": "不来姨妈！别总怀疑得了多囊"
+      },
+      {
+        "selector": "#detail-desc",
+        "text_preview": "#愿世界没有痛经 #内分泌平衡 #多囊"
+      },
+      {
+        "selector": ".engage-bar .like-wrapper",
+        "text_preview": "5"
+      },
+      {
+        "selector": ".engage-bar .collect-wrapper",
+        "text_preview": "1"
+      },
+      {
+        "selector": ".engage-bar .chat-wrapper",
+        "text_preview": "评论"
+      },
+      {
+        "selector": ".engage-bar .share-wrapper",
+        "text_preview": ""
+      },
+      {
+        "selector": "#detail-desc a[href*=\"search\"]",
+        "text_preview": "#愿世界没有痛经"
+      },
+      {
+        "selector": "#detail-desc a[href*=\"search\"]",
+        "text_preview": "#内分泌平衡"
+      },
+      {
+        "selector": "#detail-desc a[href*=\"search\"]",
+        "text_preview": "#多囊"
+      },
+      {
+        "selector": "a[href*=\"/search\"]",
+        "text_preview": "#愿世界没有痛经"
+      },
+      {
+        "selector": "a[href*=\"/search\"]",
+        "text_preview": "#内分泌平衡"
+      },
+      {
+        "selector": "a[href*=\"/search\"]",
+        "text_preview": "#多囊"
+      }
+    ]
+  }
+}

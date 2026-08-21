@@ -62,7 +62,7 @@ creators:
 - `login-only`：只验证和保存登录状态。
 - `export-only`：只从 SQLite 重新生成 Excel，不访问小红书。
 - `qa-only`：只做本地数据校验，不访问小红书。
-- `debug-extract`：对指定 `--note-id` 生成单帖字段核对报告，输出到 `debug/live_extract/<run_id>/extraction_report.json`，默认不纳入 Git。
+- `debug-extract`：对指定 `--note-id` 生成单帖字段核对报告，输出到 `debug/live_extract/<run_id>/extraction_report.json`，用于开发阶段人工审查字段来源和 DOM 证据。
 
 ## 数据质量规则
 

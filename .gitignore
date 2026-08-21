@@ -8,7 +8,6 @@ data/checkpoints/
 data/backups/
 data/raw/
 output/
-debug/live_extract/
 screenshots/errors/
 screenshots/navigation_probe/
 *.cookie

@@ -1,0 +1,130 @@
+{
+  "run_id": "2026-08-21T212206_0800_06d676db",
+  "note_id": "664c92e5000000001500804e",
+  "detail_ready": true,
+  "status": "OK",
+  "fields": {
+    "title": {
+      "value": "亲测有效｜30s教你打开排湿开关（详细教程）",
+      "source": "DOM_EXACT",
+      "confidence": "high",
+      "dom_evidence_preview": "亲测有效｜30s教你打开排湿开关（详细教程）"
+    },
+    "body": {
+      "value": "尊嘟有效！第二次极限艾灸祛湿气成功啦！还有艾灸时注意保暖，我是为了演示才穿的吊带。另外全程无广，可能穴位搭配没那么好，毕竟不是专业的，欢迎专业人士指正 #不懂就问有问必答 #祛湿气#养生 #上热下寒 #中焦不通",
+      "source": "DOM_EXACT",
+      "confidence": "high",
+      "dom_evidence_preview": "尊嘟有效！第二次极限艾灸祛湿气成功啦！还有艾灸时注意保暖，我是为了演示才穿的吊带。另外全程无广，可能穴位搭配没那么好，毕竟不是专业的，欢迎专业人士指正 #不懂就问有问必答 #祛湿气#养生 #上热下寒 #中焦不通"
+    },
+    "note_type": {
+      "value": "视频",
+      "source": "DOM_EXACT",
+      "confidence": "high",
+      "dom_evidence_preview": null
+    },
+    "publish_time": {
+      "value": "2024-05-29",
+      "source": "DOM_EXACT",
+      "confidence": "high",
+      "dom_evidence_preview": null
+    },
+    "like_count": {
+      "value": 32000,
+      "source": "DOM_EXACT",
+      "confidence": "high",
+      "dom_evidence_preview": "3.2万"
+    },
+    "collect_count": {
+      "value": 24000,
+      "source": "DOM_EXACT",
+      "confidence": "high",
+      "dom_evidence_preview": "2.4万"
+    },
+    "comment_count": {
+      "value": 318,
+      "source": "DOM_EXACT",
+      "confidence": "high",
+      "dom_evidence_preview": "318"
+    },
+    "share_count": {
+      "value": 1210,
+      "source": "DETAIL_INITIAL_STATE",
+      "confidence": "high",
+      "dom_evidence_preview": null
+    },
+    "tags": {
+      "value": [
+        "上热下寒",
+        "不懂就问有问必答",
+        "中焦不通",
+        "养生",
+        "祛湿气"
+      ],
+      "source": "DOM_EXACT",
+      "confidence": "high",
+      "dom_evidence_preview": "#不懂就问有问必答"
+    }
+  },
+  "dom_summary": {
+    "selectors_checked": [
+      "#detail-title",
+      "#detail-desc",
+      ".engage-bar .like-wrapper",
+      ".engage-bar .collect-wrapper",
+      ".engage-bar .chat-wrapper",
+      ".engage-bar .share-wrapper",
+      "#detail-desc a[href*=\"search\"]",
+      "a[href*=\"/search\"]"
+    ],
+    "matched_nodes": [
+      {
+        "selector": "#detail-title",
+        "text_preview": "亲测有效｜30s教你打开排湿开关（详细教程）"
+      },
+      {
+        "selector": "#detail-desc",
+        "text_preview": "尊嘟有效！第二次极限艾灸祛湿气成功啦！还有艾灸时注意保暖，我是为了演示才穿的吊带。另外全程无广，可能穴位搭配没那么好，毕竟不是专业的，欢迎专业人士指正 #不懂就问有问必答 #祛湿气#养生 #上热下寒 #中焦不通"
+      },
+      {
+        "selector": ".engage-bar .like-wrapper",
+        "text_preview": "3.2万"
+      },
+      {
+        "selector": ".engage-bar .collect-wrapper",
+        "text_preview": "2.4万"
+      },
+      {
+        "selector": ".engage-bar .chat-wrapper",
+        "text_preview": "318"
+      },
+      {
+        "selector": ".engage-bar .share-wrapper",
+        "text_preview": ""
+      },
+      {
+        "selector": "#detail-desc a[href*=\"search\"]",
+        "text_preview": "#不懂就问有问必答"
+      },
+      {
+        "selector": "#detail-desc a[href*=\"search\"]",
+        "text_preview": "#祛湿气"
+      },
+      {
+        "selector": "#detail-desc a[href*=\"search\"]",
+        "text_preview": "#养生"
+      },
+      {
+        "selector": "a[href*=\"/search\"]",
+        "text_preview": "#不懂就问有问必答"
+      },
+      {
+        "selector": "a[href*=\"/search\"]",
+        "text_preview": "#祛湿气"
+      },
+      {
+        "selector": "a[href*=\"/search\"]",
+        "text_preview": "#养生"
+      }
+    ]
+  }
+}

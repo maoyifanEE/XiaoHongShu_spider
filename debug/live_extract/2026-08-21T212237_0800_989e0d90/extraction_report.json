@@ -1,0 +1,129 @@
+{
+  "run_id": "2026-08-21T212237_0800_989e0d90",
+  "note_id": "69de332f000000002301ea70",
+  "detail_ready": true,
+  "status": "OK",
+  "fields": {
+    "title": {
+      "value": "📝记录人生第四次 小晕小倒",
+      "source": "DOM_EXACT",
+      "confidence": "high",
+      "dom_evidence_preview": "📝记录人生第四次 小晕小倒"
+    },
+    "body": {
+      "value": "这周去查一下是什么原因\n还是太虚了\n#身体容易累 #那些煎熬着的日子 #年轻人身体就是好倒头就睡",
+      "source": "DOM_EXACT",
+      "confidence": "high",
+      "dom_evidence_preview": "这周去查一下是什么原因 还是太虚了 #身体容易累 #那些煎熬着的日子 #年轻人身体就是好倒头就睡"
+    },
+    "note_type": {
+      "value": "视频",
+      "source": "DOM_EXACT",
+      "confidence": "high",
+      "dom_evidence_preview": null
+    },
+    "publish_time": {
+      "value": "04-14",
+      "source": "DOM_EXACT",
+      "confidence": "high",
+      "dom_evidence_preview": null
+    },
+    "like_count": {
+      "value": 32,
+      "source": "DOM_EXACT",
+      "confidence": "high",
+      "dom_evidence_preview": "32"
+    },
+    "collect_count": {
+      "value": 5,
+      "source": "DOM_EXACT",
+      "confidence": "high",
+      "dom_evidence_preview": "5"
+    },
+    "comment_count": {
+      "value": 3,
+      "source": "DOM_EXACT",
+      "confidence": "high",
+      "dom_evidence_preview": "3"
+    },
+    "share_count": {
+      "value": null,
+      "source": "MISSING",
+      "confidence": "missing",
+      "dom_evidence_preview": null,
+      "reason": "not_observed"
+    },
+    "tags": {
+      "value": [
+        "年轻人身体就是好倒头就睡",
+        "身体容易累",
+        "那些煎熬着的日子"
+      ],
+      "source": "DOM_EXACT",
+      "confidence": "high",
+      "dom_evidence_preview": "#身体容易累"
+    }
+  },
+  "dom_summary": {
+    "selectors_checked": [
+      "#detail-title",
+      "#detail-desc",
+      ".engage-bar .like-wrapper",
+      ".engage-bar .collect-wrapper",
+      ".engage-bar .chat-wrapper",
+      ".engage-bar .share-wrapper",
+      "#detail-desc a[href*=\"search\"]",
+      "a[href*=\"/search\"]"
+    ],
+    "matched_nodes": [
+      {
+        "selector": "#detail-title",
+        "text_preview": "📝记录人生第四次 小晕小倒"
+      },
+      {
+        "selector": "#detail-desc",
+        "text_preview": "这周去查一下是什么原因 还是太虚了 #身体容易累 #那些煎熬着的日子 #年轻人身体就是好倒头就睡"
+      },
+      {
+        "selector": ".engage-bar .like-wrapper",
+        "text_preview": "32"
+      },
+      {
+        "selector": ".engage-bar .collect-wrapper",
+        "text_preview": "5"
+      },
+      {
+        "selector": ".engage-bar .chat-wrapper",
+        "text_preview": "3"
+      },
+      {
+        "selector": ".engage-bar .share-wrapper",
+        "text_preview": ""
+      },
+      {
+        "selector": "#detail-desc a[href*=\"search\"]",
+        "text_preview": "#身体容易累"
+      },
+      {
+        "selector": "#detail-desc a[href*=\"search\"]",
+        "text_preview": "#那些煎熬着的日子"
+      },
+      {
+        "selector": "#detail-desc a[href*=\"search\"]",
+        "text_preview": "#年轻人身体就是好倒头就睡"
+      },
+      {
+        "selector": "a[href*=\"/search\"]",
+        "text_preview": "#身体容易累"
+      },
+      {
+        "selector": "a[href*=\"/search\"]",
+        "text_preview": "#那些煎熬着的日子"
+      },
+      {
+        "selector": "a[href*=\"/search\"]",
+        "text_preview": "#年轻人身体就是好倒头就睡"
+      }
+    ]
+  }
+}

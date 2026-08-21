@@ -52,6 +52,7 @@ creators:
 .\.venv\Scripts\python.exe -m xhs_profile_exporter --mode export-only
 .\.venv\Scripts\python.exe -m xhs_profile_exporter --mode qa-only
 .\.venv\Scripts\python.exe -m xhs_profile_exporter --mode debug-extract --note-id 664c92e5000000001500804e
+.\.venv\Scripts\python.exe -m xhs_profile_exporter --mode golden-live
 .\.venv\Scripts\python.exe -m xhs_profile_exporter --creator 辣香郭 --max-notes 5
 ```
 
@@ -63,6 +64,7 @@ creators:
 - `export-only`：只从 SQLite 重新生成 Excel，不访问小红书。
 - `qa-only`：只做本地数据校验，不访问小红书。
 - `debug-extract`：对指定 `--note-id` 生成单帖字段核对报告，输出到 `debug/live_extract/<run_id>/extraction_report.json`，用于开发阶段人工审查字段来源和 DOM 证据。
+- `golden-live`：只验证 `tests/fixtures/golden_notes/` 中的固定笔记，使用当前生产 extractor 的 live 结果直接对比人工 fixture。
 
 ## 数据质量规则
 

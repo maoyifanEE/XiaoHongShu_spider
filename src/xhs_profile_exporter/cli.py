@@ -10,6 +10,7 @@ from .config import load_config
 from .crawler import Crawler
 from .db import Database
 from .exporter import export_excel
+from .golden_validation import run_live_golden_validation
 from .navigation_probe import run_navigation_probe
 from .qa import run_offline_qa
 from .utils import ensure_dirs, setup_logging
@@ -18,7 +19,7 @@ from .utils import ensure_dirs, setup_logging
 def main(argv: list[str] | None = None) -> int:
     base_dir = Path(__file__).resolve().parents[2]
     parser = argparse.ArgumentParser(description="小红书指定博主公开信息采集与 Excel 导出工具")
-    parser.add_argument("--mode", choices=["collect", "smoke", "login-only", "export-only", "qa-only", "navigation-probe", "debug-extract"], default="collect")
+    parser.add_argument("--mode", choices=["collect", "smoke", "login-only", "export-only", "qa-only", "navigation-probe", "debug-extract", "golden-live"], default="collect")
     parser.add_argument("--smoke", action="store_true", help="等价于 --mode smoke")
     parser.add_argument("--login-only", action="store_true", help="等价于 --mode login-only")
     parser.add_argument("--export-only", action="store_true", help="等价于 --mode export-only")
@@ -81,6 +82,10 @@ def main(argv: list[str] | None = None) -> int:
             result = asyncio.run(crawler.debug_extract(args.note_id, args.creator))
             print(json.dumps(result, ensure_ascii=False, indent=2))
             return 0 if all(item.get("status") == "OK" for item in result.values()) else 2
+        if args.mode == "golden-live":
+            result = asyncio.run(run_live_golden_validation(config, db, logger, base_dir / "tests" / "fixtures" / "golden_notes", args.creator))
+            print(json.dumps(result, ensure_ascii=False, indent=2))
+            return 0 if result.get("passed") else 2
         result = asyncio.run(crawler.run(args.mode, args.creator, args.max_notes, resume=args.resume))
         print(json.dumps(result, ensure_ascii=False, indent=2))
         return exit_code_for_results(args.mode, result)

@@ -64,7 +64,9 @@ creators:
 - `export-only`：只从 SQLite 重新生成 Excel，不访问小红书。
 - `qa-only`：只做本地数据校验，不访问小红书。
 - `debug-extract`：对指定 `--note-id` 生成单帖字段核对报告，输出到 `debug/live_extract/<run_id>/extraction_report.json`，用于开发阶段人工审查字段来源和 DOM 证据。
-- `golden-live`：只验证 `tests/fixtures/golden_notes/` 中的固定笔记，使用当前生产 extractor 的 live 结果直接对比人工 fixture。
+- `golden-live`：只验证 `tests/fixtures/golden_notes/` 中的固定笔记，使用当前生产 extractor 的 live 结果直接对比人工 fixture，并输出 `validation/golden_review/<note_id>/` 审查材料。
+
+Golden fixture 字段使用 `exact`、`missing`、`skip` 三种断言语义；`skip` 字段会记录 live actual/source，但不参与 PASS/FAIL。
 
 ## 数据质量规则
 

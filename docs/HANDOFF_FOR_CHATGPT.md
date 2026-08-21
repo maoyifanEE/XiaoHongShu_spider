@@ -1,5 +1,78 @@
 # Handoff for ChatGPT / Code Review
 
+## Golden Truth Hardening - 2026-08-21
+
+Baseline before this hardening pass:
+
+```text
+d94828f87b401a41d0ebc3200e0d3d9d18cb9fd4
+Add live golden validation runner
+```
+
+This pass hardens the three-note golden validation workflow without changing production extractor selectors, cover navigation, detail readiness, source priority, delay/retry, or risk-control behavior.
+
+Key changes:
+
+- `body` is now part of `COMPARE_FIELDS`.
+- Golden fixture fields now use explicit assertion semantics:
+  - `exact`: live extractor value must equal fixture value.
+  - `missing`: live extractor value must be absent/empty.
+  - `skip`: field is shown in reports with actual/source but does not affect PASS/FAIL.
+- Bare `null` is no longer accepted as an unknown manual value.
+- `golden-live` now uses one browser lifecycle and one profile discovery for the three golden notes instead of re-opening login/profile/discovery per note.
+- `golden-live` still uses normal profile cover navigation; it does not use direct `/explore` URLs or internal APIs.
+- On `RISK_CONTROL_DETECTED` or `HUMAN_VERIFICATION_REQUIRED`, golden live validation stops immediately and does not continue to later notes.
+- Golden review artifacts are written under `validation/golden_review/<note_id>/`:
+  - `page_screenshot.png`
+  - `detail.html`
+  - `actual.json`
+  - `fixture.json`
+  - `dom_summary.json`
+- `detail.html` is scoped to the verified detail root selected with the same selector/evidence logic as the production extractor. It is not `page.content()`.
+- `href` and `src` attributes are sanitized before writing HTML; auth headers, cookies, tokens, browser storage, full network responses, and full initial state dumps are not saved.
+
+Expected live command after this pass:
+
+```powershell
+.\.venv\Scripts\python.exe -m xhs_profile_exporter --mode golden-live
+```
+
+The intended review path for ChatGPT is:
+
+1. Inspect `tests/fixtures/golden_notes/*.json`.
+2. Inspect `validation/golden_review/<note_id>/fixture.json`.
+3. Inspect `validation/golden_review/<note_id>/actual.json`.
+4. Inspect `validation/golden_review/<note_id>/dom_summary.json`.
+5. Inspect `validation/golden_review/<note_id>/detail.html` and `page_screenshot.png`.
+6. Compare visual truth, scoped DOM, production extractor output, and fixture assertions.
+
+Latest bounded live result:
+
+```text
+run_id=2026-08-21T220205_0800_c559008c
+golden-live passed=false
+safe_stop_reason=null
+asserted_fields=20
+passed_fields=16
+failed_fields=4
+skipped_fields=7
+```
+
+Per-note result:
+
+- `664c92e5000000001500804e`: asserted `7`, passed `7`, failed `0`, skipped `2`.
+- `69de332f000000002301ea70`: asserted `7`, passed `7`, failed `0`, skipped `2`.
+- `6a7b27e9000000003400c518`: asserted `6`, passed `2`, failed `4`, skipped `3`.
+
+Observed failure for `6a7b27e9000000003400c518`:
+
+- `publish_time`: expected `08-11`, actual `null`, source `MISSING`.
+- `like_count`: expected `5`, actual `null`, source `MISSING`.
+- `collect_count`: expected `1`, actual `null`, source `MISSING`.
+- `tags`: expected `["内分泌平衡", "多囊", "愿世界没有痛经"]`, actual `null`, source `MISSING`.
+
+Important review note: `validation/golden_review/6a7b27e9000000003400c518/dom_summary.json` shows the scoped detail DOM contains `08-11`, like `5`, collect `1`, and three tags, while `actual.json` records production extractor output missing those fields. This points to an extractor/readiness timing or root-selection issue to review next. The production extractor was not changed in this hardening pass.
+
 ## Goal
 
 Build a Windows-local, low-frequency, read-only Xiaohongshu public profile exporter for a configured creator. The tool should use a project-owned Playwright persistent profile, store long-term data in SQLite, support checkpoint/recovery, and export readable Excel workbooks.

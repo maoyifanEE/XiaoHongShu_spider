@@ -2,8 +2,18 @@ import asyncio
 import json
 from pathlib import Path
 
+import pytest
+
 from xhs_profile_exporter import golden_validation
-from xhs_profile_exporter.golden_validation import COMPARE_FIELDS, compare_golden_expected, load_golden_fixtures
+from xhs_profile_exporter.golden_validation import (
+    COMPARE_FIELDS,
+    build_actual_payload,
+    compare_golden_expected,
+    load_golden_fixtures,
+    sanitize_detail_html,
+    validate_golden_fixture,
+    write_golden_review_artifact,
+)
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -14,51 +24,156 @@ def test_live_golden_validation(monkeypatch):
     fixtures = load_golden_fixtures(FIXTURE_DIR)
     fixture_by_note = {fixture["note_id"]: fixture for fixture in fixtures}
 
-    async def fake_extract_note_for_validation(crawler, note_id, creator_filter=None):
-        expected = fixture_by_note[note_id]["expected"]
-        return {
-            "run_id": "mock-live",
-            "status": "OK",
-            "login_status": "LOGIN_OK",
-            "note_id": note_id,
-            "detail_ready": True,
-            "fields": {
-                field: {"value": expected.get(field), "source": "DOM_EXACT"}
-                for field in COMPARE_FIELDS
-            },
-        }
+    async def fake_extract_golden_notes_for_validation(crawler, fixtures, creator_filter=None, capture_artifacts=True):
+        notes = []
+        aggregate = {"asserted_fields": 0, "passed_fields": 0, "failed_fields": 0, "skipped_fields": 0}
+        for fixture in fixtures:
+            fields = _actual_fields_from_expected(fixture_by_note[fixture["note_id"]]["expected"])
+            comparison = compare_golden_expected(fixture["note_id"], fixture["expected"], fields)
+            for key in aggregate:
+                aggregate[key] += comparison["stats"][key]
+            notes.append(
+                {
+                    "note_id": fixture["note_id"],
+                    "status": "OK",
+                    "login_status": "LOGIN_OK",
+                    "detail_ready": True,
+                    "stats": comparison["stats"],
+                    "diffs": comparison["diffs"],
+                }
+            )
+        return {"mode": "golden-live", "run_id": "mock-live", "passed": True, "safe_stop_reason": None, "stats": aggregate, "notes": notes, "diffs": []}
 
-    monkeypatch.setattr(golden_validation, "extract_note_for_validation", fake_extract_note_for_validation)
+    monkeypatch.setattr(golden_validation, "extract_golden_notes_for_validation", fake_extract_golden_notes_for_validation)
 
     result = asyncio.run(golden_validation.run_live_golden_validation(None, None, None, FIXTURE_DIR))
 
     assert result["passed"] is True
     assert len(result["notes"]) == 3
     assert result["diffs"] == []
+    assert result["stats"]["skipped_fields"] > 0
 
 
-def test_golden_note_extraction_mismatch_report_includes_source():
-    diffs = compare_golden_expected(
-        "664c92e5000000001500804e",
-        {"like_count": 32000},
-        {"like_count": {"value": 3200, "source": "DOM_EXACT"}},
+def test_golden_exact_assertion():
+    result = compare_golden_expected(
+        "note",
+        _expected_with("like_count", {"assert": "exact", "value": 32000}),
+        _actual_with("like_count", 32000, "DOM_EXACT"),
     )
+    assert result["passed"] is True
+    assert result["stats"]["passed_fields"] == 1
 
-    assert diffs == [
+
+def test_golden_missing_assertion():
+    result = compare_golden_expected(
+        "note",
+        _expected_with("share_count", {"assert": "missing"}),
+        _actual_with("share_count", None, "MISSING"),
+    )
+    assert result["passed"] is True
+    assert result["stats"]["passed_fields"] == 1
+
+
+def test_golden_skip_assertion():
+    result = compare_golden_expected(
+        "note",
+        _expected_with("body", {"assert": "skip", "reason": "manual_unknown"}),
+        _actual_with("body", "live text", "DOM_EXACT"),
+    )
+    assert result["passed"] is True
+    assert result["stats"]["asserted_fields"] == 0
+    assert result["stats"]["skipped_fields"] == len(COMPARE_FIELDS)
+    body = next(item for item in result["fields"] if item["field"] == "body")
+    assert body["actual"] == "live text"
+
+
+def test_unknown_null_not_used_as_skip():
+    fixture = {"note_id": "note", "expected": {field: {"assert": "skip", "reason": "x"} for field in COMPARE_FIELDS}}
+    fixture["expected"]["share_count"] = None
+    with pytest.raises(ValueError, match="assertion semantics"):
+        validate_golden_fixture(fixture)
+
+
+def test_body_is_a_golden_field():
+    assert "body" in COMPARE_FIELDS
+    for fixture in load_golden_fixtures(FIXTURE_DIR):
+        assert "body" in fixture["expected"]
+
+
+def test_golden_compare_reports_skipped_fields():
+    result = compare_golden_expected(
+        "note",
+        _expected_with("body", {"assert": "skip", "reason": "manual_unknown"}),
+        _actual_with("body", "actual body", "DOM_EXACT"),
+    )
+    body = next(item for item in result["fields"] if item["field"] == "body")
+    assert body == {
+        "field": "body",
+        "assertion": "skip",
+        "expected": None,
+        "actual": "actual body",
+        "source": "DOM_EXACT",
+        "passed": None,
+        "reason": "manual_unknown",
+    }
+
+
+def test_golden_artifact_schema(tmp_path: Path):
+    actual = build_actual_payload(
+        "note",
+        True,
         {
-            "note_id": "664c92e5000000001500804e",
-            "field": "like_count",
-            "expected": 32000,
-            "actual": 3200,
-            "source": "DOM_EXACT",
-        }
-    ]
+            field: {"value": "v", "source": "DOM_EXACT"}
+            for field in COMPARE_FIELDS
+        },
+    )
+    dom_summary = {
+        "note_id": "note",
+        "detail_root": {"root_found": True, "root_reason": "DETAIL_EVIDENCE_ROOT"},
+        "fields": {
+            field: {"selectors_checked": ["#x"], "matched_count": 1, "text": "v"}
+            for field in COMPARE_FIELDS
+        },
+    }
+    fixture = tmp_path / "fixture.json"
+    fixture.write_text(json.dumps({"note_id": "note", "expected": {}}, ensure_ascii=False), encoding="utf-8")
+    screenshot = tmp_path / "shot.png"
+    screenshot.write_bytes(b"png")
+
+    artifact_dir = write_golden_review_artifact(tmp_path, "note", fixture, actual, dom_summary, '<a href="https://x.test/a?token=secret">x</a>', screenshot)
+
+    assert (artifact_dir / "actual.json").exists()
+    assert (artifact_dir / "dom_summary.json").exists()
+    assert (artifact_dir / "detail.html").exists()
+    assert (artifact_dir / "fixture.json").exists()
+    assert (artifact_dir / "page_screenshot.png").exists()
+    assert "token" not in (artifact_dir / "detail.html").read_text(encoding="utf-8").lower()
 
 
-def test_golden_fixtures_have_expected_schema():
-    fixtures = load_golden_fixtures(FIXTURE_DIR)
-    assert len(fixtures) == 3
-    for fixture in fixtures:
-        assert fixture["note_id"]
-        assert set(fixture["expected"]) == set(COMPARE_FIELDS)
-        json.dumps(fixture, ensure_ascii=False)
+def test_golden_html_url_sanitization():
+    html = '<img src="https://img.test/a.png?xsec_token=abc&width=1#frag"><a href="/search?token=abc">tag</a>'
+    sanitized = sanitize_detail_html(html).lower()
+    assert "xsec" not in sanitized
+    assert "token" not in sanitized
+    assert "?" not in sanitized
+    assert "#frag" not in sanitized
+
+
+def _expected_with(field: str, spec: dict):
+    expected = {name: {"assert": "skip", "reason": "unit_test_not_under_assertion"} for name in COMPARE_FIELDS}
+    expected[field] = spec
+    return expected
+
+
+def _actual_with(field: str, value, source: str):
+    actual = {name: {"value": None, "source": "MISSING"} for name in COMPARE_FIELDS}
+    actual[field] = {"value": value, "source": source}
+    return actual
+
+
+def _actual_fields_from_expected(expected: dict):
+    fields = {}
+    for field, spec in expected.items():
+        value = spec.get("value") if spec["assert"] == "exact" else None
+        fields[field] = {"value": value, "source": "DOM_EXACT" if value is not None else "MISSING"}
+    return fields

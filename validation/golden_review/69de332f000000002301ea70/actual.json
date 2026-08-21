@@ -1,0 +1,56 @@
+{
+  "note_id": "69de332f000000002301ea70",
+  "detail_ready": true,
+  "fields": {
+    "title": {
+      "value": "📝记录人生第四次 小晕小倒",
+      "source": "DOM_EXACT"
+    },
+    "body": {
+      "value": "这周去查一下是什么原因\n还是太虚了\n#身体容易累 #那些煎熬着的日子 #年轻人身体就是好倒头就睡",
+      "source": "DOM_EXACT"
+    },
+    "note_type": {
+      "value": "视频",
+      "source": "DOM_EXACT"
+    },
+    "publish_time": {
+      "value": "04-14",
+      "source": "DOM_EXACT",
+      "raw_display": "04-14"
+    },
+    "like_count": {
+      "value": 32,
+      "source": "DOM_EXACT",
+      "raw_display": "32"
+    },
+    "collect_count": {
+      "value": 5,
+      "source": "DOM_EXACT",
+      "raw_display": "5"
+    },
+    "comment_count": {
+      "value": 3,
+      "source": "DOM_EXACT",
+      "raw_display": "3"
+    },
+    "share_count": {
+      "value": null,
+      "source": "MISSING"
+    },
+    "tags": {
+      "value": [
+        "年轻人身体就是好倒头就睡",
+        "身体容易累",
+        "那些煎熬着的日子"
+      ],
+      "source": "DOM_EXACT"
+    }
+  },
+  "raw_display": {
+    "like_raw": "32",
+    "collect_raw": "5",
+    "comment_raw": "3",
+    "share_raw": null
+  }
+}

@@ -84,6 +84,74 @@ def test_strong_detail_root_extracts_fields():
     assert note["hashtags"] == ["测试标签"]
 
 
+def test_label_only_comment_metric_does_not_infer_zero():
+    html = """
+    <section class="note-detail" style="display:block;width:800px;height:600px">
+      <h1 id="detail-title">目标标题</h1>
+      <div id="detail-desc">目标正文</div>
+      <div class="engage-bar">
+        <div class="chat-wrapper"><span class="count">评论</span></div>
+      </div>
+    </section>
+    """
+    note = asyncio.run(_extract_from_html(html))
+    assert note["comments_value"] is None
+    assert note["field_sources"].get("comment_count") == "MISSING"
+    assert note["comment_zero_evidence"] is False
+
+
+def test_scoped_empty_comment_state_infers_exact_zero():
+    html = """
+    <section class="note-detail" style="display:block;width:800px;height:600px">
+      <h1 id="detail-title">目标标题</h1>
+      <div id="detail-desc">目标正文</div>
+      <div class="engage-bar">
+        <div class="chat-wrapper"><span class="count">评论</span></div>
+      </div>
+      <div class="comments-empty">这是一片荒地点击评论</div>
+    </section>
+    """
+    note = asyncio.run(_extract_from_html(html))
+    assert note["comments_value"] == 0
+    assert note["comments_raw"] == "0"
+    assert note["comments_is_exact"] is True
+    assert note["field_sources"].get("comment_count") == "DOM_EXACT"
+    assert note["comment_zero_evidence"] is True
+    assert note["comment_zero_evidence_text"] == "这是一片荒地点击评论"
+
+
+def test_numeric_comment_metric_wins_without_empty_state():
+    html = """
+    <section class="note-detail" style="display:block;width:800px;height:600px">
+      <h1 id="detail-title">目标标题</h1>
+      <div id="detail-desc">目标正文</div>
+      <div class="engage-bar">
+        <div class="chat-wrapper"><span class="count">3</span></div>
+      </div>
+    </section>
+    """
+    note = asyncio.run(_extract_from_html(html))
+    assert note["comments_value"] == 3
+    assert note["comments_is_exact"] is True
+
+
+def test_empty_comment_text_outside_detail_root_does_not_infer_zero():
+    html = """
+    <aside style="display:block;width:800px;height:100px">暂无评论</aside>
+    <section class="note-detail" style="display:block;width:800px;height:600px">
+      <h1 id="detail-title">目标标题</h1>
+      <div id="detail-desc">目标正文</div>
+      <div class="engage-bar">
+        <div class="chat-wrapper"><span class="count">评论</span></div>
+      </div>
+    </section>
+    """
+    note = asyncio.run(_extract_from_html(html))
+    assert note["comments_value"] is None
+    assert note["field_sources"].get("comment_count") == "MISSING"
+    assert note["comment_zero_evidence"] is False
+
+
 def test_sidebar_fake_count_does_not_pollute_note_metrics():
     html = """
     <section class="note-detail" style="display:block;width:800px;height:600px">

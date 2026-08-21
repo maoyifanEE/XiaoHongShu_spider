@@ -30,9 +30,11 @@
       "raw_display": "1"
     },
     "comment_count": {
-      "value": null,
-      "source": "MISSING",
-      "raw_display": "评论"
+      "value": 0,
+      "source": "DOM_EXACT",
+      "raw_display": "0",
+      "zero_comment_evidence": true,
+      "zero_comment_evidence_text": "这是一片荒地点击评论"
     },
     "share_count": {
       "value": null,
@@ -50,7 +52,7 @@
   "raw_display": {
     "like_raw": "5",
     "collect_raw": "1",
-    "comment_raw": "评论",
+    "comment_raw": "0",
     "share_raw": null
   }
 }

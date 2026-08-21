@@ -51,7 +51,7 @@ def test_live_golden_validation(monkeypatch):
     assert result["passed"] is True
     assert len(result["notes"]) == 3
     assert result["diffs"] == []
-    assert result["stats"]["skipped_fields"] > 0
+    assert result["stats"] == {"asserted_fields": 24, "passed_fields": 24, "failed_fields": 0, "skipped_fields": 3}
 
 
 def test_golden_exact_assertion():
@@ -98,6 +98,27 @@ def test_body_is_a_golden_field():
     assert "body" in COMPARE_FIELDS
     for fixture in load_golden_fixtures(FIXTURE_DIR):
         assert "body" in fixture["expected"]
+
+
+def test_first_golden_note_body_is_exact():
+    fixture = _fixture("664c92e5000000001500804e")
+    assert fixture["expected"]["body"] == {
+        "assert": "exact",
+        "value": "尊嘟有效！第二次极限艾灸祛湿气成功啦！还有艾灸时注意保暖，我是为了演示才穿的吊带。另外全程无广，可能穴位搭配没那么好，毕竟不是专业的，欢迎专业人士指正 #不懂就问有问必答 #祛湿气#养生 #上热下寒 #中焦不通",
+    }
+
+
+def test_second_golden_note_comment_count_is_exact_zero():
+    fixture = _fixture("6a7b27e9000000003400c518")
+    assert fixture["expected"]["comment_count"] == {"assert": "exact", "value": 0}
+
+
+def test_third_golden_note_body_is_exact():
+    fixture = _fixture("69de332f000000002301ea70")
+    assert fixture["expected"]["body"] == {
+        "assert": "exact",
+        "value": "这周去查一下是什么原因\n还是太虚了\n#身体容易累 #那些煎熬着的日子 #年轻人身体就是好倒头就睡",
+    }
 
 
 def test_golden_compare_reports_skipped_fields():
@@ -183,3 +204,7 @@ def _actual_fields_from_expected(expected: dict):
         value = spec.get("value") if spec["assert"] == "exact" else None
         fields[field] = {"value": value, "source": "DOM_EXACT" if value is not None else "MISSING"}
     return fields
+
+
+def _fixture(note_id: str):
+    return next(fixture for fixture in load_golden_fixtures(FIXTURE_DIR) if fixture["note_id"] == note_id)

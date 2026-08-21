@@ -75,7 +75,23 @@
           ".engage-bar [class*=Comment]"
         ],
         "matched_count": 1,
-        "text": "318"
+        "text": "318",
+        "zero_comment_evidence": {
+          "selectors_checked": [
+            "[class*=comment]",
+            "[class*=Comment]",
+            "[data-testid*=comment]",
+            "[class*=empty]",
+            "[class*=Empty]",
+            "[class*=placeholder]",
+            "[class*=Placeholder]",
+            "p",
+            "div",
+            "span"
+          ],
+          "matched_count": 0,
+          "text": ""
+        }
       },
       "share_count": {
         "selectors_checked": [
@@ -174,7 +190,23 @@
           ".engage-bar [class*=Comment]"
         ],
         "matched_count": 1,
-        "text": "318"
+        "text": "318",
+        "zero_comment_evidence": {
+          "selectors_checked": [
+            "[class*=comment]",
+            "[class*=Comment]",
+            "[data-testid*=comment]",
+            "[class*=empty]",
+            "[class*=Empty]",
+            "[class*=placeholder]",
+            "[class*=Placeholder]",
+            "p",
+            "div",
+            "span"
+          ],
+          "matched_count": 0,
+          "text": ""
+        }
       },
       "share_count": {
         "selectors_checked": [

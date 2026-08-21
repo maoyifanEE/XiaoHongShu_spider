@@ -10,8 +10,8 @@
       "value": "亲测有效｜30s教你打开排湿开关（详细教程）"
     },
     "body": {
-      "assert": "skip",
-      "reason": "full_body_requires_golden_review_artifact"
+      "assert": "exact",
+      "value": "尊嘟有效！第二次极限艾灸祛湿气成功啦！还有艾灸时注意保暖，我是为了演示才穿的吊带。另外全程无广，可能穴位搭配没那么好，毕竟不是专业的，欢迎专业人士指正 #不懂就问有问必答 #祛湿气#养生 #上热下寒 #中焦不通"
     },
     "note_type": {
       "assert": "exact",

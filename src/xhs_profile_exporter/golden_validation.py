@@ -78,6 +78,12 @@ def validate_golden_fixture(fixture: dict[str, Any]) -> None:
 
 def normalized_extraction_from_note(note: dict[str, Any]) -> dict[str, dict[str, Any]]:
     sources = note.get("field_sources") or {}
+    comment_evidence = {}
+    if note.get("comment_zero_evidence"):
+        comment_evidence = {
+            "zero_comment_evidence": True,
+            "zero_comment_evidence_text": (note.get("comment_zero_evidence_text") or "")[:200],
+        }
     return {
         "title": _field(note.get("title"), sources.get("title")),
         "body": _field(note.get("body"), sources.get("body")),
@@ -85,7 +91,7 @@ def normalized_extraction_from_note(note: dict[str, Any]) -> dict[str, dict[str,
         "publish_time": _field(note.get("publish_time"), sources.get("publish_time"), note.get("publish_time_raw")),
         "like_count": _field(note.get("likes_value"), sources.get("like_count"), note.get("likes_raw")),
         "collect_count": _field(note.get("collects_value"), sources.get("collect_count"), note.get("collects_raw")),
-        "comment_count": _field(note.get("comments_value"), sources.get("comment_count"), note.get("comments_raw")),
+        "comment_count": _field(note.get("comments_value"), sources.get("comment_count"), note.get("comments_raw"), comment_evidence),
         "share_count": _field(note.get("shares_value"), sources.get("share_count"), note.get("shares_raw")),
         "tags": _field(note.get("hashtags") or [], sources.get("tags")),
     }
@@ -336,6 +342,32 @@ async def capture_detail_review_state(page: Any, note_id: str) -> dict[str, Any]
             const count = el ? el.querySelector(".count, [class*=count], [class*=Count]") : null;
             return {selectors_checked: selectors, matched_count: el ? 1 : 0, text: clean(count || el)};
           };
+          const zeroCommentWords = ["这是一片荒地", "暂无评论", "还没有评论"];
+          const zeroCommentEvidence = () => {
+            if (!root) return {selectors_checked: [], matched_count: 0, text: ""};
+            const selectors = [
+              '[class*=comment]',
+              '[class*=Comment]',
+              '[data-testid*=comment]',
+              '[class*=empty]',
+              '[class*=Empty]',
+              '[class*=placeholder]',
+              '[class*=Placeholder]',
+              'p',
+              'div',
+              'span'
+            ];
+            const text = Array.from(root.querySelectorAll(selectors.join(',')))
+              .filter(visible)
+              .map((el) => clean(el))
+              .filter((candidate) => candidate && candidate.length <= 200 && zeroCommentWords.some((word) => candidate.includes(word)))
+              .sort((a, b) => a.length - b.length)[0] || "";
+            return {
+              selectors_checked: selectors,
+              matched_count: text ? 1 : 0,
+              text
+            };
+          };
           const clone = root ? root.cloneNode(true) : null;
           if (clone) {
             clone.querySelectorAll('[class*=comment-item], [class*=commentItem], [data-testid*=comment], [class*=comments], [class*=Comments]').forEach((el) => el.remove());
@@ -361,7 +393,10 @@ async def capture_detail_review_state(page: Any, note_id: str) -> dict[str, Any]
             publish_time: {selectors_checked: ["detail root text"], matched_count: root ? 1 : 0, text: root ? clean(root).slice(0, 500) : ""},
             like_count: metric([".engage-bar .like-wrapper", ".engage-bar [class*=like-wrapper]", ".engage-bar [class*=likeWrapper]", ".engage-bar [class*=Like]"]),
             collect_count: metric([".engage-bar .collect-wrapper", ".engage-bar [class*=collect-wrapper]", ".engage-bar [class*=collectWrapper]", ".engage-bar [class*=Collect]"]),
-            comment_count: metric([".engage-bar .chat-wrapper", ".engage-bar [class*=chat-wrapper]", ".engage-bar [class*=comment-wrapper]", ".engage-bar [class*=Chat]", ".engage-bar [class*=Comment]"]),
+            comment_count: {
+              ...metric([".engage-bar .chat-wrapper", ".engage-bar [class*=chat-wrapper]", ".engage-bar [class*=comment-wrapper]", ".engage-bar [class*=Chat]", ".engage-bar [class*=Comment]"]),
+              zero_comment_evidence: zeroCommentEvidence()
+            },
             share_count: metric([".engage-bar .share-wrapper", ".engage-bar [class*=share-wrapper]", ".engage-bar [class*=shareWrapper]", ".engage-bar [class*=Share]"]),
             tags: {selectors_checked: ['#detail-desc a[href*="search"]', '#detail-desc a[href*="search_result"]', 'a[href*="/search_result"]', 'a[href*="/search"]'], matched_count: root ? root.querySelectorAll('#detail-desc a[href*="search"], #detail-desc a[href*="search_result"], a[href*="/search_result"], a[href*="/search"]').length : 0, text: root ? Array.from(root.querySelectorAll('#detail-desc a[href*="search"], #detail-desc a[href*="search_result"], a[href*="/search_result"], a[href*="/search"]')).map((el) => clean(el)).filter(Boolean).join("\\n") : ""}
           };
@@ -386,10 +421,12 @@ async def capture_detail_review_state(page: Any, note_id: str) -> dict[str, Any]
     )
 
 
-def _field(value: Any, source: Any, raw_display: Any = None) -> dict[str, Any]:
+def _field(value: Any, source: Any, raw_display: Any = None, extra: dict[str, Any] | None = None) -> dict[str, Any]:
     output = {"value": value if _present(value) else None, "source": str(source or "MISSING") if _present(value) else "MISSING"}
     if raw_display is not None:
         output["raw_display"] = raw_display
+    if extra:
+        output.update(extra)
     return output
 
 

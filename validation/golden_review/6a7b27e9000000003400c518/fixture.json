@@ -30,8 +30,8 @@
       "value": 1
     },
     "comment_count": {
-      "assert": "skip",
-      "reason": "not_visible_in_manual_reference"
+      "assert": "exact",
+      "value": 0
     },
     "share_count": {
       "assert": "skip",

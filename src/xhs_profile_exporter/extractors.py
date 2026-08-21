@@ -185,6 +185,24 @@ async def extract_note_dom(page: Any, note_id: str, top_n: int = 3) -> dict[str,
                nested: Boolean(childComment),
              };
           });
+          const zeroCommentWords = ["这是一片荒地", "暂无评论", "还没有评论"];
+          const zeroCommentSelectors = [
+            '[class*=comment]',
+            '[class*=Comment]',
+            '[data-testid*=comment]',
+            '[class*=empty]',
+            '[class*=Empty]',
+            '[class*=placeholder]',
+            '[class*=Placeholder]',
+            'p',
+            'div',
+            'span'
+          ].join(',');
+          const zeroCommentEvidenceText = Array.from(root.querySelectorAll(zeroCommentSelectors))
+            .filter(visible)
+            .map((el) => clean(el))
+            .filter((text) => text && text.length <= 200 && zeroCommentWords.some((word) => text.includes(word)))
+            .sort((a, b) => a.length - b.length)[0] || "";
           return {
             rootFound: true,
             rootReason: evidenceRoot ? "DETAIL_EVIDENCE_ROOT" : "DETAIL_WRAPPER_ROOT",
@@ -192,6 +210,8 @@ async def extract_note_dom(page: Any, note_id: str, top_n: int = 3) -> dict[str,
             title: titleEl ? titleEl.innerText : "",
             desc: descEl ? descEl.innerText : "",
             domMetrics,
+            commentZeroEvidence: Boolean(zeroCommentEvidenceText),
+            commentZeroEvidenceText: zeroCommentEvidenceText,
             tagNames,
             meta,
             comments,
@@ -210,7 +230,7 @@ async def extract_note_dom(page: Any, note_id: str, top_n: int = 3) -> dict[str,
     hashtags = merge_tags(data.get("tagNames") or [], _extract_tags(body))
     publish_raw = _extract_publish_time(text)
     publish_time, publish_time_raw = normalize_relative_time(publish_raw)
-    metrics = _extract_note_metrics(data.get("domMetrics") or {})
+    metrics = _extract_note_metrics(data.get("domMetrics") or {}, bool(data.get("commentZeroEvidence")))
     comments = _extract_comments(data.get("comments") or [], top_n)
     return {
         "note_id": note_id,
@@ -227,7 +247,15 @@ async def extract_note_dom(page: Any, note_id: str, top_n: int = 3) -> dict[str,
         "status": unavailable_status[0] if unavailable_status else ("OK" if body or title else "PARSE_PARTIAL"),
         "status_note": unavailable_status[1] if unavailable_status else (None if body or title else "DOM 未提取到标题或正文"),
         "top_comments": comments,
-        "raw_json": {"meta": data.get("meta"), "url": sanitize_url(data.get("url")), "root_reason": data.get("rootReason")},
+        "raw_json": {
+            "meta": data.get("meta"),
+            "url": sanitize_url(data.get("url")),
+            "root_reason": data.get("rootReason"),
+            "comment_zero_evidence": bool(data.get("commentZeroEvidence")),
+            "comment_zero_evidence_text": (data.get("commentZeroEvidenceText") or "")[:200],
+        },
+        "comment_zero_evidence": bool(data.get("commentZeroEvidence")),
+        "comment_zero_evidence_text": (data.get("commentZeroEvidenceText") or "")[:200],
         "source": "dom",
         "field_sources": _note_field_sources(
             {
@@ -404,11 +432,15 @@ def merge_tags(*tag_groups: Any) -> list[str]:
     return sorted({tag.strip().lstrip("#") for tag in tags if tag and tag.strip().lstrip("#")})
 
 
-def _extract_note_metrics(dom_metrics: dict[str, Any]) -> dict[str, Any]:
+def _extract_note_metrics(dom_metrics: dict[str, Any], comment_zero_evidence: bool = False) -> dict[str, Any]:
     result: dict[str, Any] = {}
     for key in ["likes", "collects", "comments", "shares"]:
         raw = dom_metrics.get(key)
         value, raw_display, exact = parse_count(raw)
+        if key == "comments" and value is None and comment_zero_evidence:
+            value = 0
+            raw_display = "0"
+            exact = True
         result[f"{key}_value"] = value
         result[f"{key}_raw"] = raw_display
         result[f"{key}_is_exact"] = exact

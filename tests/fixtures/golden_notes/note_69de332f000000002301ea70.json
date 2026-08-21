@@ -1,0 +1,21 @@
+{
+  "note_id": "69de332f000000002301ea70",
+  "validation_basis": {
+    "debug_report": "debug/live_extract/2026-08-21T212237_0800_989e0d90/extraction_report.json",
+    "source_note": "人工核对截图、debug report、Excel"
+  },
+  "expected": {
+    "title": "📝记录人生第四次 小晕小倒",
+    "note_type": "视频",
+    "publish_time": "04-14",
+    "like_count": 32,
+    "collect_count": 5,
+    "comment_count": 3,
+    "share_count": null,
+    "tags": [
+      "年轻人身体就是好倒头就睡",
+      "身体容易累",
+      "那些煎熬着的日子"
+    ]
+  }
+}

@@ -1,0 +1,21 @@
+{
+  "note_id": "6a7b27e9000000003400c518",
+  "validation_basis": {
+    "debug_report": "debug/live_extract/2026-08-21T212222_0800_b89f4fd8/extraction_report.json",
+    "source_note": "人工核对截图、debug report、Excel"
+  },
+  "expected": {
+    "title": "不来姨妈！别总怀疑得了多囊",
+    "note_type": "视频",
+    "publish_time": "08-11",
+    "like_count": 5,
+    "collect_count": 1,
+    "comment_count": null,
+    "share_count": null,
+    "tags": [
+      "内分泌平衡",
+      "多囊",
+      "愿世界没有痛经"
+    ]
+  }
+}

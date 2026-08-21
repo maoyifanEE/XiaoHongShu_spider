@@ -1,0 +1,23 @@
+{
+  "note_id": "664c92e5000000001500804e",
+  "validation_basis": {
+    "debug_report": "debug/live_extract/2026-08-21T212206_0800_06d676db/extraction_report.json",
+    "source_note": "人工核对截图、debug report、Excel"
+  },
+  "expected": {
+    "title": "亲测有效｜30s教你打开排湿开关（详细教程）",
+    "note_type": "视频",
+    "publish_time": "2024-05-29",
+    "like_count": 32000,
+    "collect_count": 24000,
+    "comment_count": 318,
+    "share_count": 1210,
+    "tags": [
+      "上热下寒",
+      "不懂就问有问必答",
+      "中焦不通",
+      "养生",
+      "祛湿气"
+    ]
+  }
+}

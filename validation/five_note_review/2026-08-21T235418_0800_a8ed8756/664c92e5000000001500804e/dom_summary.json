@@ -1,0 +1,336 @@
+{
+  "note_id": "664c92e5000000001500804e",
+  "pre_extract_dom_summary": {
+    "note_id": "664c92e5000000001500804e",
+    "detail_root": {
+      "root_found": true,
+      "root_reason": "DETAIL_EVIDENCE_ROOT",
+      "detail_selector": "[class*=\"note-detail\"], [class*=\"noteDetail\"], [class*=\"NoteDetail\"], [data-testid*=\"note-detail\"], [role=\"dialog\"]",
+      "evidence_selector": "#detail-title, #detail-desc, .engage-bar, [class*=engage], [class*=interaction], [class*=Interact]",
+      "detail_root_count": 3,
+      "evidence_count": 29
+    },
+    "fields": {
+      "title": {
+        "selectors_checked": [
+          "#detail-title",
+          "h1",
+          "[class*=title]",
+          "[data-testid*=title]"
+        ],
+        "matched_count": 1,
+        "text": "亲测有效｜30s教你打开排湿开关（详细教程）"
+      },
+      "body": {
+        "selectors_checked": [
+          "#detail-desc",
+          "[class*=desc]",
+          "[class*=content]",
+          ".note-content",
+          "[data-testid*=content]"
+        ],
+        "matched_count": 1,
+        "text": "尊嘟有效！第二次极限艾灸祛湿气成功啦！还有艾灸时注意保暖，我是为了演示才穿的吊带。另外全程无广，可能穴位搭配没那么好，毕竟不是专业的，欢迎专业人士指正 #不懂就问有问必答 #祛湿气#养生 #上热下寒 #中焦不通"
+      },
+      "publish_time": {
+        "selectors_checked": [
+          "detail root text"
+        ],
+        "matched_count": 1,
+        "text": "辣香郭\n关注\n亲测有效｜30s教你打开排湿开关（详细教程）\n尊嘟有效！第二次极限艾灸祛湿气成功啦！还有艾灸时注意保暖，我是为了演示才穿的吊带。另外全程无广，可能穴位搭配没那么好，毕竟不是专业的，欢迎专业人士指正 #不懂就问有问必答 #祛湿气#养生 #上热下寒 #中焦不通\n猜你想搜\n艾灸是补气血还是耗气血\n编辑于 2024-05-29\n共 318 条评论\n辣香郭\n作者\n放个合集，舌苔对比图，从上周五到今天\n置顶评论\n2024-05-21江西\n99\n27\n辣香郭\n作者\n从上到下，一个穴位不超过15分钟\n2024-05-22江西\n80\n回复\n展开 26 条回复\nMQ.\n我买了个艾灸的罐子可以绑身上的，结果我才绑了10分钟，给我腰上严重烫伤\n2024-05-24湖南\n19\n12\n辣香郭\n作者\n你可以移动调节火大小呀我的天\n2024-05-25江西\n34\n回复\n展开 11 条回复\n兰色新空\n每个穴位灸多久呢？一天中灸的时间有讲究吗\n2024-05-22湖南\n35\n4\n辣香郭\n作者\n15分钟，睡前不灸\n2024-05-22江西\n35\n回复\n展开 3 条回复\n甜柚、\n可以今天灸上面明天灸下面吗？\n2"
+      },
+      "like_count": {
+        "selectors_checked": [
+          ".engage-bar .like-wrapper",
+          ".engage-bar [class*=like-wrapper]",
+          ".engage-bar [class*=likeWrapper]",
+          ".engage-bar [class*=Like]"
+        ],
+        "matched_count": 1,
+        "text": "3.2万"
+      },
+      "collect_count": {
+        "selectors_checked": [
+          ".engage-bar .collect-wrapper",
+          ".engage-bar [class*=collect-wrapper]",
+          ".engage-bar [class*=collectWrapper]",
+          ".engage-bar [class*=Collect]"
+        ],
+        "matched_count": 1,
+        "text": "2.4万"
+      },
+      "comment_count": {
+        "selectors_checked": [
+          ".engage-bar .chat-wrapper",
+          ".engage-bar [class*=chat-wrapper]",
+          ".engage-bar [class*=comment-wrapper]",
+          ".engage-bar [class*=Chat]",
+          ".engage-bar [class*=Comment]"
+        ],
+        "matched_count": 1,
+        "text": "318",
+        "zero_comment_evidence": {
+          "comment_area_found": true,
+          "comment_area_selector": "div.comments-el",
+          "comment_area_selectors_checked": [
+            "[class*=\"comments-container\"]",
+            "[class*=\"commentsContainer\"]",
+            "[class*=\"CommentsContainer\"]",
+            "[class*=\"comments-list\"]",
+            "[class*=\"commentsList\"]",
+            "[class*=\"CommentsList\"]",
+            "[class*=\"comment-list\"]",
+            "[class*=\"commentList\"]",
+            "[class*=\"CommentList\"]",
+            "[class*=\"comments-el\"]",
+            "[class*=\"commentsEl\"]",
+            "[class*=\"CommentsEl\"]",
+            "[data-testid*=\"comments\"]",
+            "[data-testid*=\"comment-list\"]"
+          ],
+          "comment_area_node": {
+            "tag": "div",
+            "id": "",
+            "class": "comments-el",
+            "data_testid": "",
+            "role": ""
+          },
+          "comment_area_ancestors": [
+            {
+              "tag": "div",
+              "id": "",
+              "class": "comments-el",
+              "data_testid": "",
+              "role": ""
+            },
+            {
+              "tag": "div",
+              "id": "",
+              "class": "note-scroller",
+              "data_testid": "",
+              "role": ""
+            },
+            {
+              "tag": "div",
+              "id": "",
+              "class": "interaction-container",
+              "data_testid": "",
+              "role": ""
+            },
+            {
+              "tag": "div",
+              "id": "noteContainer",
+              "class": "note-container",
+              "data_testid": "",
+              "role": ""
+            },
+            {
+              "tag": "div",
+              "id": "",
+              "class": "note-detail-mask",
+              "data_testid": "",
+              "role": ""
+            }
+          ],
+          "selectors_checked": [
+            "[class*=empty]",
+            "[class*=Empty]",
+            "[class*=placeholder]",
+            "[class*=Placeholder]",
+            "[data-testid*=empty]",
+            "[data-testid*=placeholder]"
+          ],
+          "matched_count": 0,
+          "text": ""
+        }
+      },
+      "share_count": {
+        "selectors_checked": [
+          ".engage-bar .share-wrapper",
+          ".engage-bar [class*=share-wrapper]",
+          ".engage-bar [class*=shareWrapper]",
+          ".engage-bar [class*=Share]"
+        ],
+        "matched_count": 1,
+        "text": ""
+      },
+      "tags": {
+        "selectors_checked": [
+          "#detail-desc a[href*=\"search\"]",
+          "#detail-desc a[href*=\"search_result\"]",
+          "a[href*=\"/search_result\"]",
+          "a[href*=\"/search\"]"
+        ],
+        "matched_count": 5,
+        "text": "#不懂就问有问必答\n#祛湿气\n#养生\n#上热下寒\n#中焦不通"
+      }
+    }
+  },
+  "post_extract_dom_summary": {
+    "note_id": "664c92e5000000001500804e",
+    "detail_root": {
+      "root_found": true,
+      "root_reason": "DETAIL_EVIDENCE_ROOT",
+      "detail_selector": "[class*=\"note-detail\"], [class*=\"noteDetail\"], [class*=\"NoteDetail\"], [data-testid*=\"note-detail\"], [role=\"dialog\"]",
+      "evidence_selector": "#detail-title, #detail-desc, .engage-bar, [class*=engage], [class*=interaction], [class*=Interact]",
+      "detail_root_count": 3,
+      "evidence_count": 29
+    },
+    "fields": {
+      "title": {
+        "selectors_checked": [
+          "#detail-title",
+          "h1",
+          "[class*=title]",
+          "[data-testid*=title]"
+        ],
+        "matched_count": 1,
+        "text": "亲测有效｜30s教你打开排湿开关（详细教程）"
+      },
+      "body": {
+        "selectors_checked": [
+          "#detail-desc",
+          "[class*=desc]",
+          "[class*=content]",
+          ".note-content",
+          "[data-testid*=content]"
+        ],
+        "matched_count": 1,
+        "text": "尊嘟有效！第二次极限艾灸祛湿气成功啦！还有艾灸时注意保暖，我是为了演示才穿的吊带。另外全程无广，可能穴位搭配没那么好，毕竟不是专业的，欢迎专业人士指正 #不懂就问有问必答 #祛湿气#养生 #上热下寒 #中焦不通"
+      },
+      "publish_time": {
+        "selectors_checked": [
+          "detail root text"
+        ],
+        "matched_count": 1,
+        "text": "请刷新试试\n辣香郭\n关注\n亲测有效｜30s教你打开排湿开关（详细教程）\n尊嘟有效！第二次极限艾灸祛湿气成功啦！还有艾灸时注意保暖，我是为了演示才穿的吊带。另外全程无广，可能穴位搭配没那么好，毕竟不是专业的，欢迎专业人士指正 #不懂就问有问必答 #祛湿气#养生 #上热下寒 #中焦不通\n猜你想搜\n艾灸是补气血还是耗气血\n编辑于 2024-05-29\n共 318 条评论\n辣香郭\n作者\n放个合集，舌苔对比图，从上周五到今天\n置顶评论\n2024-05-21江西\n99\n27\n辣香郭\n作者\n从上到下，一个穴位不超过15分钟\n2024-05-22江西\n80\n回复\n展开 26 条回复\nMQ.\n我买了个艾灸的罐子可以绑身上的，结果我才绑了10分钟，给我腰上严重烫伤\n2024-05-24湖南\n19\n12\n辣香郭\n作者\n你可以移动调节火大小呀我的天\n2024-05-25江西\n34\n回复\n展开 11 条回复\n兰色新空\n每个穴位灸多久呢？一天中灸的时间有讲究吗\n2024-05-22湖南\n35\n4\n辣香郭\n作者\n15分钟，睡前不灸\n2024-05-22江西\n35\n回复\n展开 3 条回复\n甜柚、\n可以今天灸上面明天灸"
+      },
+      "like_count": {
+        "selectors_checked": [
+          ".engage-bar .like-wrapper",
+          ".engage-bar [class*=like-wrapper]",
+          ".engage-bar [class*=likeWrapper]",
+          ".engage-bar [class*=Like]"
+        ],
+        "matched_count": 1,
+        "text": "3.2万"
+      },
+      "collect_count": {
+        "selectors_checked": [
+          ".engage-bar .collect-wrapper",
+          ".engage-bar [class*=collect-wrapper]",
+          ".engage-bar [class*=collectWrapper]",
+          ".engage-bar [class*=Collect]"
+        ],
+        "matched_count": 1,
+        "text": "2.4万"
+      },
+      "comment_count": {
+        "selectors_checked": [
+          ".engage-bar .chat-wrapper",
+          ".engage-bar [class*=chat-wrapper]",
+          ".engage-bar [class*=comment-wrapper]",
+          ".engage-bar [class*=Chat]",
+          ".engage-bar [class*=Comment]"
+        ],
+        "matched_count": 1,
+        "text": "318",
+        "zero_comment_evidence": {
+          "comment_area_found": true,
+          "comment_area_selector": "div.comments-el",
+          "comment_area_selectors_checked": [
+            "[class*=\"comments-container\"]",
+            "[class*=\"commentsContainer\"]",
+            "[class*=\"CommentsContainer\"]",
+            "[class*=\"comments-list\"]",
+            "[class*=\"commentsList\"]",
+            "[class*=\"CommentsList\"]",
+            "[class*=\"comment-list\"]",
+            "[class*=\"commentList\"]",
+            "[class*=\"CommentList\"]",
+            "[class*=\"comments-el\"]",
+            "[class*=\"commentsEl\"]",
+            "[class*=\"CommentsEl\"]",
+            "[data-testid*=\"comments\"]",
+            "[data-testid*=\"comment-list\"]"
+          ],
+          "comment_area_node": {
+            "tag": "div",
+            "id": "",
+            "class": "comments-el",
+            "data_testid": "",
+            "role": ""
+          },
+          "comment_area_ancestors": [
+            {
+              "tag": "div",
+              "id": "",
+              "class": "comments-el",
+              "data_testid": "",
+              "role": ""
+            },
+            {
+              "tag": "div",
+              "id": "",
+              "class": "note-scroller",
+              "data_testid": "",
+              "role": ""
+            },
+            {
+              "tag": "div",
+              "id": "",
+              "class": "interaction-container",
+              "data_testid": "",
+              "role": ""
+            },
+            {
+              "tag": "div",
+              "id": "noteContainer",
+              "class": "note-container",
+              "data_testid": "",
+              "role": ""
+            },
+            {
+              "tag": "div",
+              "id": "",
+              "class": "note-detail-mask",
+              "data_testid": "",
+              "role": ""
+            }
+          ],
+          "selectors_checked": [
+            "[class*=empty]",
+            "[class*=Empty]",
+            "[class*=placeholder]",
+            "[class*=Placeholder]",
+            "[data-testid*=empty]",
+            "[data-testid*=placeholder]"
+          ],
+          "matched_count": 0,
+          "text": ""
+        }
+      },
+      "share_count": {
+        "selectors_checked": [
+          ".engage-bar .share-wrapper",
+          ".engage-bar [class*=share-wrapper]",
+          ".engage-bar [class*=shareWrapper]",
+          ".engage-bar [class*=Share]"
+        ],
+        "matched_count": 1,
+        "text": ""
+      },
+      "tags": {
+        "selectors_checked": [
+          "#detail-desc a[href*=\"search\"]",
+          "#detail-desc a[href*=\"search_result\"]",
+          "a[href*=\"/search_result\"]",
+          "a[href*=\"/search\"]"
+        ],
+        "matched_count": 5,
+        "text": "#不懂就问有问必答\n#祛湿气\n#养生\n#上热下寒\n#中焦不通"
+      }
+    }
+  },
+  "pre_post_consistent": false
+}

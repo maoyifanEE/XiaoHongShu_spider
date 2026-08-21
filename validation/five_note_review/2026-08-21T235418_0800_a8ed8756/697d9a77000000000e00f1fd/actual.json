@@ -1,0 +1,59 @@
+{
+  "note_id": "697d9a77000000000e00f1fd",
+  "detail_ready": true,
+  "status": "OK",
+  "fields": {
+    "title": {
+      "value": "如果我光头你还会爱我吗？",
+      "source": "DOM_EXACT"
+    },
+    "body": {
+      "value": "#白天鹅生发仪#生发养发#养发#剃光头养发",
+      "source": "DOM_EXACT"
+    },
+    "note_type": {
+      "value": "视频",
+      "source": "DOM_EXACT"
+    },
+    "publish_time": {
+      "value": "01-31",
+      "source": "DOM_EXACT"
+    },
+    "like_count": {
+      "value": 58,
+      "source": "DOM_EXACT",
+      "raw": "58",
+      "exact": true
+    },
+    "collect_count": {
+      "value": 8,
+      "source": "DOM_EXACT",
+      "raw": "8",
+      "exact": true
+    },
+    "comment_count": {
+      "value": 17,
+      "source": "DOM_EXACT",
+      "raw": "17",
+      "exact": true
+    },
+    "share_count": {
+      "value": null,
+      "source": "MISSING",
+      "missing_reason": "not_observed"
+    },
+    "tags": {
+      "value": [
+        "养发",
+        "剃光头养发",
+        "生发养发",
+        "白天鹅生发仪"
+      ],
+      "source": "DOM_EXACT"
+    }
+  },
+  "quality": {
+    "passed": true,
+    "issues": []
+  }
+}

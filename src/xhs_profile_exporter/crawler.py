@@ -28,6 +28,14 @@ from .extractors import (
     note_completeness_values,
 )
 from .exporter import export_excel
+from .five_note_review import (
+    build_actual_payload as build_five_note_actual_payload,
+    capture_five_note_review_state,
+    five_note_review_dir,
+    validate_excel_readback,
+    write_excel_readback_artifact,
+    write_note_review_artifact,
+)
 from .qa import run_offline_qa
 from .runtime import CollectionResult, OpenNoteResult, RunBudget, SafeStopRequested
 from .state import LoginStatus, RunStatus
@@ -228,9 +236,25 @@ class Crawler:
                     note_cards = [card for card in note_cards if card["note_id"] not in resume_completed]
                     self.logger.info("RECOVERY_MODE mapped_current_cards=%s skipped_completed=%s remaining=%s", before_resume, before_resume - len(note_cards), len(note_cards))
 
-                collection = await self._collect_notes(page, creator, note_cards, checkpoint, budget, target_exportable=target_exportable, initial_completed=resume_completed)
+                review_dir = five_note_review_dir(self.app_config.base_dir, run_id) if mode == "collect" and int(limit or 0) == 5 else None
+                collection = await self._collect_notes(page, creator, note_cards, checkpoint, budget, target_exportable=target_exportable, initial_completed=resume_completed, review_dir=review_dir)
                 offline = run_offline_qa(self.db, user_id, self.logger)
                 excel_path = export_excel(self.db, self.app_config.base_dir, user_id, creator.name, self.logger)
+                excel_readback = None
+                if review_dir:
+                    expected_ids = list(collection.exportable_ids)
+                    expected_rows = [row for row in self.db.current_notes(user_id) if row["note_id"] in set(expected_ids)]
+                    excel_readback = validate_excel_readback(excel_path, expected_rows, expected_ids)
+                    write_excel_readback_artifact(review_dir, excel_readback, excel_path)
+                    self.logger.info(
+                        "FIVE_NOTE_REVIEW excel_readback rows_expected=%s rows_found=%s duplicates=%s missing=%s diffs=%s path=%s",
+                        excel_readback["rows_expected"],
+                        excel_readback["rows_found"],
+                        len(excel_readback["duplicate_note_ids"]),
+                        len(excel_readback["missing_note_ids"]),
+                        len(excel_readback["field_diffs"]),
+                        review_dir / "excel_readback.json",
+                    )
                 database_exportable = len(self.db.current_notes(user_id))
                 status = determine_run_status(mode, collection, target_exportable)
                 validation_dir = write_live_validation_artifact(
@@ -312,6 +336,8 @@ class Crawler:
                     "excel": str(excel_path),
                     "offline_qa": offline,
                     "validation_artifact": str(validation_dir),
+                    "five_note_review_artifact": str(review_dir) if review_dir else None,
+                    "excel_readback": excel_readback,
                 }
         except SafeStopRequested as stop:
             checkpoint.mark_safe_stop(stop.reason)
@@ -396,6 +422,7 @@ class Crawler:
         budget: RunBudget,
         target_exportable: int | None = None,
         initial_completed: set[str] | None = None,
+        review_dir: Any | None = None,
     ) -> CollectionResult:
         result = CollectionResult()
         errors = 0
@@ -458,6 +485,7 @@ class Crawler:
                         prefer_incoming=True,
                         incoming_source="DETAIL_INITIAL_STATE",
                     )
+                pre_extract_capture = await capture_five_note_review_state(page, note_id) if review_dir else None
                 note = await extract_note_dom(page, note_id, top_n)
                 if note.get("status") != "OK":
                     self.logger.info("NOTE non_ok note_id=%s status=%s reason=%s", note_id, note.get("status"), note.get("status_note"))
@@ -478,6 +506,20 @@ class Crawler:
                 checkpoint.save(self.app_config.base_dir / "data" / "checkpoints")
                 errors = 0
                 self.logger.info("NOTE attempt_result note_id=%s result=PARSED title=%s likes=%s exact=%s comments=%s top_level_comments=%s status=%s target_verified=true", note_id, note.get("title"), note.get("likes_value"), note.get("likes_is_exact"), note.get("comments_value"), len(note.get("top_comments", [])), note.get("status"))
+                if review_dir and pre_extract_capture:
+                    post_extract_capture = await capture_five_note_review_state(page, note_id)
+                    screenshot_tmp = review_dir / f".{note_id}_{uuid.uuid4().hex}.png"
+                    await page.screenshot(path=str(screenshot_tmp), full_page=False)
+                    artifact_path = write_note_review_artifact(
+                        review_dir,
+                        note_id,
+                        build_five_note_actual_payload(note),
+                        pre_extract_capture,
+                        post_extract_capture,
+                        screenshot_tmp,
+                    )
+                    screenshot_tmp.unlink(missing_ok=True)
+                    self.logger.info("FIVE_NOTE_REVIEW note_artifact_exported note_id=%s path=%s", note_id, artifact_path)
                 return_result = await self._return_to_creator_profile(page, creator.url, note_id)
                 result.count_profile_return(return_result["strategy"])
                 self.logger.info(

@@ -51,6 +51,7 @@ creators:
 .\.venv\Scripts\python.exe -m xhs_profile_exporter --mode smoke
 .\.venv\Scripts\python.exe -m xhs_profile_exporter --mode export-only
 .\.venv\Scripts\python.exe -m xhs_profile_exporter --mode qa-only
+.\.venv\Scripts\python.exe -m xhs_profile_exporter --mode debug-extract --note-id 664c92e5000000001500804e
 .\.venv\Scripts\python.exe -m xhs_profile_exporter --creator 辣香郭 --max-notes 5
 ```
 
@@ -61,6 +62,7 @@ creators:
 - `login-only`：只验证和保存登录状态。
 - `export-only`：只从 SQLite 重新生成 Excel，不访问小红书。
 - `qa-only`：只做本地数据校验，不访问小红书。
+- `debug-extract`：对指定 `--note-id` 生成单帖字段核对报告，输出到 `debug/live_extract/<run_id>/extraction_report.json`，默认不纳入 Git。
 
 ## 数据质量规则
 
@@ -79,4 +81,3 @@ creators:
 ## 常见限制
 
 平台页面结构、评论排序、互动数和可见笔记都可能随时间、账号和算法变化。最终报告表述为“本次运行发现的全部当前公开可访问笔记”，不声称覆盖账号历史上绝对全部笔记。
-

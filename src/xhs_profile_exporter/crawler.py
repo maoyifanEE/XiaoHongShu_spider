@@ -15,6 +15,7 @@ from .browser import BrowserSession, detect_page_status
 from .checkpoint import Checkpoint
 from .config import AppConfig, CreatorConfig
 from .db import Database
+from .debug_report import build_extraction_report, write_extraction_report
 from .extractors import (
     discover_note_cards,
     extract_note_dom,
@@ -63,6 +64,84 @@ class Crawler:
             result = await self._run_creator(creator, mode, max_notes=max_notes, resume=resume)
             results[creator.name] = result
         return results
+
+    async def debug_extract(self, note_id: str, creator_filter: str | None = None) -> dict[str, Any]:
+        results = {}
+        creators = [c for c in self.app_config.creators if c.enabled and self._matches(c, creator_filter)]
+        if not creators:
+            raise ValueError("没有匹配且启用的 creator")
+        for creator in creators:
+            results[creator.name] = await self._debug_extract_creator(creator, note_id)
+        return results
+
+    async def _debug_extract_creator(self, creator: CreatorConfig, note_id: str) -> dict[str, Any]:
+        user_id = creator.user_id or extract_user_id(creator.url)
+        run_id = f"{now_iso().replace(':', '').replace('+', '_')}_{uuid.uuid4().hex[:8]}"
+        self.current_run_id = run_id
+        self.current_creator_id = user_id
+        self.structured_by_note = {}
+        self.structured_profile = None
+        self.logger.info("DEBUG_EXTRACT start run_id=%s note_id=%s creator_id=%s", run_id, note_id, user_id)
+        budget = self._build_budget()
+        checkpoint = Checkpoint(run_id=run_id, creator_id=user_id)
+        try:
+            async with BrowserSession(self.app_config.base_dir, self.app_config.raw, self.logger) as browser:
+                browser.response_callback = lambda url, data: self._capture_structured(run_id, url, data)
+                page = await browser.new_page()
+                budget.count_page_visit("debug_login_check", note_id)
+                login_status = await browser.check_login(page, creator.url)
+                if login_status in {LoginStatus.LOGIN_EXPIRED, LoginStatus.HUMAN_VERIFICATION_REQUIRED}:
+                    login_status = await browser.wait_for_login(page, creator.url)
+                if login_status != LoginStatus.LOGIN_OK:
+                    return {"run_id": run_id, "status": login_status.value, "login_status": login_status.value, "note_id": note_id}
+
+                note_cards = await self._discover_notes(page, checkpoint, budget, target_unique=60)
+                card = next((item for item in note_cards if item.get("note_id") == note_id), None)
+                if not card:
+                    self.logger.info("DEBUG_EXTRACT note_not_found run_id=%s note_id=%s discovered=%s", run_id, note_id, len(note_cards))
+                    return {"run_id": run_id, "status": "NOTE_NOT_FOUND", "login_status": LoginStatus.LOGIN_OK.value, "note_id": note_id, "notes_discovered": len(note_cards)}
+
+                open_result = await self._open_note_from_profile(page, creator.url, card, budget)
+                page = open_result.page
+                if not open_result.target_verified:
+                    return {
+                        "run_id": run_id,
+                        "status": open_result.reason or "TARGET_NOT_VERIFIED",
+                        "login_status": LoginStatus.LOGIN_OK.value,
+                        "note_id": note_id,
+                        "detail_ready": bool(open_result.detail_ready),
+                    }
+
+                await browser_flush_if_available(page)
+                initial_state_record = await self._extract_initial_state_note_record(page, note_id)
+                if initial_state_record:
+                    self.structured_by_note[note_id] = merge_public_note_records(
+                        self.structured_by_note.get(note_id),
+                        initial_state_record,
+                        note_id,
+                        prefer_incoming=True,
+                        incoming_source="DETAIL_INITIAL_STATE",
+                    )
+                note = await extract_note_dom(page, note_id, int(self.app_config.raw.get("collection", {}).get("collect_top_comments", 3)))
+                note.update({k: card.get(k) for k in ("is_pinned",) if card.get(k) is not None})
+                note = merge_note_with_structured(note, self.structured_by_note.get(note_id))
+                dom_summary = await self._debug_dom_summary(page)
+                report = build_extraction_report(run_id=run_id, note_id=note_id, detail_ready=True, note=note, dom_summary=dom_summary)
+                report_path = write_extraction_report(self.app_config.base_dir, report)
+                self.logger.info("DEBUG_EXTRACT report_exported path=%s", report_path)
+                return {
+                    "run_id": run_id,
+                    "status": "OK",
+                    "login_status": LoginStatus.LOGIN_OK.value,
+                    "note_id": note_id,
+                    "detail_ready": True,
+                    "artifact": str(report_path),
+                }
+        except SafeStopRequested as stop:
+            self.logger.info("SAFE_STOP debug_extract phase=%s note_id=%s status=%s reason=%s", stop.phase, stop.note_id, stop.status.value, stop.reason)
+            return {"run_id": run_id, "status": stop.reason, "login_status": stop.status.value, "note_id": note_id, "safe_stop_reason": stop.reason}
+        finally:
+            self._clear_run_context(run_id, user_id)
 
     async def _run_creator(self, creator: CreatorConfig, mode: str, max_notes: int | None = None, resume: bool = False) -> dict[str, Any]:
         user_id = creator.user_id or extract_user_id(creator.url)
@@ -674,6 +753,38 @@ class Crawler:
     async def _visible_detail_root_count(self, page: Page) -> int:
         evidence = await self._get_note_detail_evidence(page, "")
         return int(evidence.get("detail_root_count") or 0)
+
+    async def _debug_dom_summary(self, page: Page) -> dict[str, Any]:
+        return await page.evaluate(
+            """
+            () => {
+              const selectors = [
+                "#detail-title",
+                "#detail-desc",
+                ".engage-bar .like-wrapper",
+                ".engage-bar .collect-wrapper",
+                ".engage-bar .chat-wrapper",
+                ".engage-bar .share-wrapper",
+                '#detail-desc a[href*="search"]',
+                'a[href*="/search"]'
+              ];
+              const visible = (el) => {
+                if (!el) return false;
+                const rect = el.getBoundingClientRect();
+                const style = window.getComputedStyle(el);
+                return rect.width > 0 && rect.height > 0 && style.display !== "none" && style.visibility !== "hidden";
+              };
+              const clean = (value) => String(value || "").replace(/\\s+/g, " ").trim().slice(0, 200);
+              const matched = [];
+              for (const selector of selectors) {
+                for (const el of Array.from(document.querySelectorAll(selector)).filter(visible).slice(0, 3)) {
+                  matched.push({selector, text_preview: clean(el.innerText || el.textContent || "")});
+                }
+              }
+              return {selectors_checked: selectors, matched_nodes: matched.slice(0, 30)};
+            }
+            """
+        )
 
     async def _get_note_detail_evidence(self, page: Page, note_id: str) -> dict[str, Any]:
         try:

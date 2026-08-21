@@ -18,13 +18,14 @@ from .utils import ensure_dirs, setup_logging
 def main(argv: list[str] | None = None) -> int:
     base_dir = Path(__file__).resolve().parents[2]
     parser = argparse.ArgumentParser(description="小红书指定博主公开信息采集与 Excel 导出工具")
-    parser.add_argument("--mode", choices=["collect", "smoke", "login-only", "export-only", "qa-only", "navigation-probe"], default="collect")
+    parser.add_argument("--mode", choices=["collect", "smoke", "login-only", "export-only", "qa-only", "navigation-probe", "debug-extract"], default="collect")
     parser.add_argument("--smoke", action="store_true", help="等价于 --mode smoke")
     parser.add_argument("--login-only", action="store_true", help="等价于 --mode login-only")
     parser.add_argument("--export-only", action="store_true", help="等价于 --mode export-only")
     parser.add_argument("--qa-only", action="store_true", help="等价于 --mode qa-only")
     parser.add_argument("--resume", action="store_true", help="显式从最近 checkpoint 续跑，默认不恢复旧 checkpoint")
     parser.add_argument("--creator", help="按昵称、小红书号、user_id 或 URL 过滤指定博主")
+    parser.add_argument("--note-id", help="debug-extract 模式下要验证的公开笔记 note_id")
     parser.add_argument("--max-notes", type=int, help="本次最多采集多少篇笔记")
     parser.add_argument("--config", type=Path, help="配置文件路径")
     parser.add_argument("--navigation-probe", action="store_true", help="Equivalent to --mode navigation-probe")
@@ -74,6 +75,12 @@ def main(argv: list[str] | None = None) -> int:
             print(json.dumps(reports, ensure_ascii=False, indent=2))
             return 0 if all(report["passed"] for report in reports.values()) else 2
         crawler = Crawler(config, db, logger)
+        if args.mode == "debug-extract":
+            if not args.note_id:
+                raise ValueError("--mode debug-extract requires --note-id")
+            result = asyncio.run(crawler.debug_extract(args.note_id, args.creator))
+            print(json.dumps(result, ensure_ascii=False, indent=2))
+            return 0 if all(item.get("status") == "OK" for item in result.values()) else 2
         result = asyncio.run(crawler.run(args.mode, args.creator, args.max_notes, resume=args.resume))
         print(json.dumps(result, ensure_ascii=False, indent=2))
         return exit_code_for_results(args.mode, result)

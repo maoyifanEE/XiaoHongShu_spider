@@ -1,99 +1,202 @@
 {
   "note_id": "6a7b27e9000000003400c518",
-  "detail_root": {
-    "root_found": true,
-    "root_reason": "DETAIL_EVIDENCE_ROOT",
-    "detail_selector": "[class*=\"note-detail\"], [class*=\"noteDetail\"], [class*=\"NoteDetail\"], [data-testid*=\"note-detail\"], [role=\"dialog\"]",
-    "evidence_selector": "#detail-title, #detail-desc, .engage-bar, [class*=engage], [class*=interaction], [class*=Interact]",
-    "detail_root_count": 3,
-    "evidence_count": 9
-  },
-  "fields": {
-    "title": {
-      "selectors_checked": [
-        "#detail-title",
-        "h1",
-        "[class*=title]",
-        "[data-testid*=title]"
-      ],
-      "matched_count": 1,
-      "text": "不来姨妈！别总怀疑得了多囊"
+  "pre_extract_dom_summary": {
+    "note_id": "6a7b27e9000000003400c518",
+    "detail_root": {
+      "root_found": true,
+      "root_reason": "DETAIL_EVIDENCE_ROOT",
+      "detail_selector": "[class*=\"note-detail\"], [class*=\"noteDetail\"], [class*=\"NoteDetail\"], [data-testid*=\"note-detail\"], [role=\"dialog\"]",
+      "evidence_selector": "#detail-title, #detail-desc, .engage-bar, [class*=engage], [class*=interaction], [class*=Interact]",
+      "detail_root_count": 3,
+      "evidence_count": 9
     },
-    "body": {
-      "selectors_checked": [
-        "#detail-desc",
-        "[class*=desc]",
-        "[class*=content]",
-        ".note-content",
-        "[data-testid*=content]"
-      ],
-      "matched_count": 1,
-      "text": "#愿世界没有痛经 #内分泌平衡 #多囊"
-    },
-    "note_type": {
-      "selectors_checked": [
-        "detail root text/meta"
-      ],
-      "matched_count": 1,
-      "text": "辣香郭\n关注\n不来姨妈！别总怀疑得了多囊\n#愿世界没有痛经 #内分泌平衡 #多囊\n08-11 广东\n加载中\n\n说点什么...\n5\n1\n评论\n发送\n取消"
-    },
-    "publish_time": {
-      "selectors_checked": [
-        "detail root text"
-      ],
-      "matched_count": 1,
-      "text": "辣香郭\n关注\n不来姨妈！别总怀疑得了多囊\n#愿世界没有痛经 #内分泌平衡 #多囊\n08-11 广东\n加载中\n\n说点什么...\n5\n1\n评论\n发送\n取消"
-    },
-    "like_count": {
-      "selectors_checked": [
-        ".engage-bar .like-wrapper",
-        ".engage-bar [class*=like-wrapper]",
-        ".engage-bar [class*=likeWrapper]",
-        ".engage-bar [class*=Like]"
-      ],
-      "matched_count": 1,
-      "text": "5"
-    },
-    "collect_count": {
-      "selectors_checked": [
-        ".engage-bar .collect-wrapper",
-        ".engage-bar [class*=collect-wrapper]",
-        ".engage-bar [class*=collectWrapper]",
-        ".engage-bar [class*=Collect]"
-      ],
-      "matched_count": 1,
-      "text": "1"
-    },
-    "comment_count": {
-      "selectors_checked": [
-        ".engage-bar .chat-wrapper",
-        ".engage-bar [class*=chat-wrapper]",
-        ".engage-bar [class*=comment-wrapper]",
-        ".engage-bar [class*=Chat]",
-        ".engage-bar [class*=Comment]"
-      ],
-      "matched_count": 1,
-      "text": "评论"
-    },
-    "share_count": {
-      "selectors_checked": [
-        ".engage-bar .share-wrapper",
-        ".engage-bar [class*=share-wrapper]",
-        ".engage-bar [class*=shareWrapper]",
-        ".engage-bar [class*=Share]"
-      ],
-      "matched_count": 1,
-      "text": ""
-    },
-    "tags": {
-      "selectors_checked": [
-        "#detail-desc a[href*=\"search\"]",
-        "#detail-desc a[href*=\"search_result\"]",
-        "a[href*=\"/search_result\"]",
-        "a[href*=\"/search\"]"
-      ],
-      "matched_count": 3,
-      "text": "#愿世界没有痛经\n#内分泌平衡\n#多囊"
+    "fields": {
+      "title": {
+        "selectors_checked": [
+          "#detail-title",
+          "h1",
+          "[class*=title]",
+          "[data-testid*=title]"
+        ],
+        "matched_count": 1,
+        "text": "不来姨妈！别总怀疑得了多囊"
+      },
+      "body": {
+        "selectors_checked": [
+          "#detail-desc",
+          "[class*=desc]",
+          "[class*=content]",
+          ".note-content",
+          "[data-testid*=content]"
+        ],
+        "matched_count": 1,
+        "text": "#愿世界没有痛经 #内分泌平衡 #多囊"
+      },
+      "note_type": {
+        "selectors_checked": [
+          "detail root text/meta"
+        ],
+        "matched_count": 1,
+        "text": "辣香郭\n关注\n不来姨妈！别总怀疑得了多囊\n#愿世界没有痛经 #内分泌平衡 #多囊\n猜你想搜\n多囊有什么危害\n08-11 广东\n\n这是一片荒地点击评论\n\n说点什么...\n5\n1\n可以添加到收藏夹啦\n评论\n发送\n取消"
+      },
+      "publish_time": {
+        "selectors_checked": [
+          "detail root text"
+        ],
+        "matched_count": 1,
+        "text": "辣香郭\n关注\n不来姨妈！别总怀疑得了多囊\n#愿世界没有痛经 #内分泌平衡 #多囊\n猜你想搜\n多囊有什么危害\n08-11 广东\n\n这是一片荒地点击评论\n\n说点什么...\n5\n1\n可以添加到收藏夹啦\n评论\n发送\n取消"
+      },
+      "like_count": {
+        "selectors_checked": [
+          ".engage-bar .like-wrapper",
+          ".engage-bar [class*=like-wrapper]",
+          ".engage-bar [class*=likeWrapper]",
+          ".engage-bar [class*=Like]"
+        ],
+        "matched_count": 1,
+        "text": "5"
+      },
+      "collect_count": {
+        "selectors_checked": [
+          ".engage-bar .collect-wrapper",
+          ".engage-bar [class*=collect-wrapper]",
+          ".engage-bar [class*=collectWrapper]",
+          ".engage-bar [class*=Collect]"
+        ],
+        "matched_count": 1,
+        "text": "1"
+      },
+      "comment_count": {
+        "selectors_checked": [
+          ".engage-bar .chat-wrapper",
+          ".engage-bar [class*=chat-wrapper]",
+          ".engage-bar [class*=comment-wrapper]",
+          ".engage-bar [class*=Chat]",
+          ".engage-bar [class*=Comment]"
+        ],
+        "matched_count": 1,
+        "text": "评论"
+      },
+      "share_count": {
+        "selectors_checked": [
+          ".engage-bar .share-wrapper",
+          ".engage-bar [class*=share-wrapper]",
+          ".engage-bar [class*=shareWrapper]",
+          ".engage-bar [class*=Share]"
+        ],
+        "matched_count": 1,
+        "text": ""
+      },
+      "tags": {
+        "selectors_checked": [
+          "#detail-desc a[href*=\"search\"]",
+          "#detail-desc a[href*=\"search_result\"]",
+          "a[href*=\"/search_result\"]",
+          "a[href*=\"/search\"]"
+        ],
+        "matched_count": 3,
+        "text": "#愿世界没有痛经\n#内分泌平衡\n#多囊"
+      }
     }
-  }
+  },
+  "post_extract_dom_summary": {
+    "note_id": "6a7b27e9000000003400c518",
+    "detail_root": {
+      "root_found": true,
+      "root_reason": "DETAIL_EVIDENCE_ROOT",
+      "detail_selector": "[class*=\"note-detail\"], [class*=\"noteDetail\"], [class*=\"NoteDetail\"], [data-testid*=\"note-detail\"], [role=\"dialog\"]",
+      "evidence_selector": "#detail-title, #detail-desc, .engage-bar, [class*=engage], [class*=interaction], [class*=Interact]",
+      "detail_root_count": 3,
+      "evidence_count": 9
+    },
+    "fields": {
+      "title": {
+        "selectors_checked": [
+          "#detail-title",
+          "h1",
+          "[class*=title]",
+          "[data-testid*=title]"
+        ],
+        "matched_count": 1,
+        "text": "不来姨妈！别总怀疑得了多囊"
+      },
+      "body": {
+        "selectors_checked": [
+          "#detail-desc",
+          "[class*=desc]",
+          "[class*=content]",
+          ".note-content",
+          "[data-testid*=content]"
+        ],
+        "matched_count": 1,
+        "text": "#愿世界没有痛经 #内分泌平衡 #多囊"
+      },
+      "note_type": {
+        "selectors_checked": [
+          "detail root text/meta"
+        ],
+        "matched_count": 1,
+        "text": "辣香郭\n关注\n不来姨妈！别总怀疑得了多囊\n#愿世界没有痛经 #内分泌平衡 #多囊\n猜你想搜\n多囊有什么危害\n08-11 广东\n\n这是一片荒地点击评论\n\n说点什么...\n5\n1\n可以添加到收藏夹啦\n评论\n发送\n取消"
+      },
+      "publish_time": {
+        "selectors_checked": [
+          "detail root text"
+        ],
+        "matched_count": 1,
+        "text": "辣香郭\n关注\n不来姨妈！别总怀疑得了多囊\n#愿世界没有痛经 #内分泌平衡 #多囊\n猜你想搜\n多囊有什么危害\n08-11 广东\n\n这是一片荒地点击评论\n\n说点什么...\n5\n1\n可以添加到收藏夹啦\n评论\n发送\n取消"
+      },
+      "like_count": {
+        "selectors_checked": [
+          ".engage-bar .like-wrapper",
+          ".engage-bar [class*=like-wrapper]",
+          ".engage-bar [class*=likeWrapper]",
+          ".engage-bar [class*=Like]"
+        ],
+        "matched_count": 1,
+        "text": "5"
+      },
+      "collect_count": {
+        "selectors_checked": [
+          ".engage-bar .collect-wrapper",
+          ".engage-bar [class*=collect-wrapper]",
+          ".engage-bar [class*=collectWrapper]",
+          ".engage-bar [class*=Collect]"
+        ],
+        "matched_count": 1,
+        "text": "1"
+      },
+      "comment_count": {
+        "selectors_checked": [
+          ".engage-bar .chat-wrapper",
+          ".engage-bar [class*=chat-wrapper]",
+          ".engage-bar [class*=comment-wrapper]",
+          ".engage-bar [class*=Chat]",
+          ".engage-bar [class*=Comment]"
+        ],
+        "matched_count": 1,
+        "text": "评论"
+      },
+      "share_count": {
+        "selectors_checked": [
+          ".engage-bar .share-wrapper",
+          ".engage-bar [class*=share-wrapper]",
+          ".engage-bar [class*=shareWrapper]",
+          ".engage-bar [class*=Share]"
+        ],
+        "matched_count": 1,
+        "text": ""
+      },
+      "tags": {
+        "selectors_checked": [
+          "#detail-desc a[href*=\"search\"]",
+          "#detail-desc a[href*=\"search_result\"]",
+          "a[href*=\"/search_result\"]",
+          "a[href*=\"/search\"]"
+        ],
+        "matched_count": 3,
+        "text": "#愿世界没有痛经\n#内分泌平衡\n#多囊"
+      }
+    }
+  },
+  "pre_post_consistent": true
 }

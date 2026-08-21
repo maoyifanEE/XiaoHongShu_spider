@@ -10,8 +10,8 @@
       "value": "不来姨妈！别总怀疑得了多囊"
     },
     "body": {
-      "assert": "skip",
-      "reason": "full_body_requires_golden_review_artifact"
+      "assert": "exact",
+      "value": "#愿世界没有痛经 #内分泌平衡 #多囊"
     },
     "note_type": {
       "assert": "exact",

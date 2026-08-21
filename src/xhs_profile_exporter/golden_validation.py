@@ -253,6 +253,7 @@ async def _extract_one_golden_note(crawler: Crawler, browser: BrowserSession, pa
         return {"_page": page, "note_id": note_id, "status": open_result.reason or "TARGET_NOT_VERIFIED", "detail_ready": bool(open_result.detail_ready), "diffs": []}
     await crawler._raise_if_safe_stop(page, "golden_note_after_open", note_id)
     await browser_flush_if_available(page)
+    pre_extract_capture = await capture_detail_review_state(page, note_id) if capture_artifacts else None
     detail_state_extractor = getattr(crawler, "_extract_" + "initial" + "_state_note_record")
     detail_state_record = await detail_state_extractor(page, note_id)
     if detail_state_record:
@@ -271,7 +272,13 @@ async def _extract_one_golden_note(crawler: Crawler, browser: BrowserSession, pa
     comparison = compare_golden_expected(note_id, fixture["expected"], fields)
     artifact_path = None
     if capture_artifacts:
-        capture = await capture_detail_review_state(page, note_id)
+        post_extract_capture = await capture_detail_review_state(page, note_id)
+        dom_summary = {
+            "note_id": note_id,
+            "pre_extract_dom_summary": pre_extract_capture["dom_summary"],
+            "post_extract_dom_summary": post_extract_capture["dom_summary"],
+            "pre_post_consistent": _dom_summaries_consistent(pre_extract_capture["dom_summary"], post_extract_capture["dom_summary"]),
+        }
         screenshot_tmp = crawler.app_config.base_dir / "validation" / "golden_review" / f".{note_id}_{uuid.uuid4().hex}.png"
         screenshot_tmp.parent.mkdir(parents=True, exist_ok=True)
         await page.screenshot(path=str(screenshot_tmp), full_page=False)
@@ -280,8 +287,8 @@ async def _extract_one_golden_note(crawler: Crawler, browser: BrowserSession, pa
             note_id,
             Path(fixture["_fixture_path"]),
             actual,
-            capture["dom_summary"],
-            capture["detail_html"],
+            dom_summary,
+            post_extract_capture["detail_html"],
             screenshot_tmp,
         )
         screenshot_tmp.unlink(missing_ok=True)
@@ -417,6 +424,15 @@ def _assert_text_artifact_safe(content: str, name: str) -> None:
     hits = [term for term in SENSITIVE_TERMS if term in lowered]
     if hits:
         raise ValueError(f"golden review artifact {name} contains sensitive terms: {sorted(set(hits))}")
+
+
+def _dom_summaries_consistent(pre: dict[str, Any], post: dict[str, Any]) -> bool:
+    pre_fields = (pre or {}).get("fields") or {}
+    post_fields = (post or {}).get("fields") or {}
+    for field in COMPARE_FIELDS:
+        if (pre_fields.get(field) or {}).get("text") != (post_fields.get(field) or {}).get("text"):
+            return False
+    return True
 
 
 def _golden_result(run_id: str, passed: bool, notes: list[dict[str, Any]], diffs: list[dict[str, Any]], stats: dict[str, int], safe_stop_reason: str | None) -> dict[str, Any]:

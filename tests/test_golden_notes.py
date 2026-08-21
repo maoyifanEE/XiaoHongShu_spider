@@ -127,13 +127,15 @@ def test_golden_artifact_schema(tmp_path: Path):
             for field in COMPARE_FIELDS
         },
     )
+    field_summary = {
+        field: {"selectors_checked": ["#x"], "matched_count": 1, "text": "v"}
+        for field in COMPARE_FIELDS
+    }
     dom_summary = {
         "note_id": "note",
-        "detail_root": {"root_found": True, "root_reason": "DETAIL_EVIDENCE_ROOT"},
-        "fields": {
-            field: {"selectors_checked": ["#x"], "matched_count": 1, "text": "v"}
-            for field in COMPARE_FIELDS
-        },
+        "pre_extract_dom_summary": {"detail_root": {"root_found": True}, "fields": field_summary},
+        "post_extract_dom_summary": {"detail_root": {"root_found": True}, "fields": field_summary},
+        "pre_post_consistent": True,
     }
     fixture = tmp_path / "fixture.json"
     fixture.write_text(json.dumps({"note_id": "note", "expected": {}}, ensure_ascii=False), encoding="utf-8")
@@ -147,6 +149,10 @@ def test_golden_artifact_schema(tmp_path: Path):
     assert (artifact_dir / "detail.html").exists()
     assert (artifact_dir / "fixture.json").exists()
     assert (artifact_dir / "page_screenshot.png").exists()
+    saved_summary = json.loads((artifact_dir / "dom_summary.json").read_text(encoding="utf-8"))
+    assert "pre_extract_dom_summary" in saved_summary
+    assert "post_extract_dom_summary" in saved_summary
+    assert saved_summary["pre_post_consistent"] is True
     assert "token" not in (artifact_dir / "detail.html").read_text(encoding="utf-8").lower()
 
 

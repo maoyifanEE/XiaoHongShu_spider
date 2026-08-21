@@ -723,6 +723,7 @@ class Crawler:
         deadline = asyncio.get_event_loop().time() + timeout_ms / 1000
         last_reason = "DETAIL_NOT_READY"
         last_detail_count = 0
+        consecutive_verified = 0
         while asyncio.get_event_loop().time() < deadline:
             await self._raise_if_safe_stop(page, "note_wait_target_detail", note_id)
             route_match = route_matches_note(page.url, note_id)
@@ -731,7 +732,11 @@ class Crawler:
             detail_count = int(evidence.get("detail_root_count") or 0)
             last_detail_count = detail_count
             if route_match and evidence.get("verified"):
-                return True, None, detail_count
+                consecutive_verified += 1
+                if consecutive_verified >= 2:
+                    return True, None, detail_count
+            else:
+                consecutive_verified = 0
             if wrong_route:
                 return False, "TARGET_MISMATCH", detail_count
             if route_match:
@@ -849,9 +854,12 @@ class Crawler:
               const hasBody = visible(desc) && descText && descText !== titleText && !loadingWords.includes(descText);
               const detailText = noteRoots.map((el) => el.innerText || "").join("\\n");
               const hasPublishTime = /\\b\\d{4}[-/.]\\d{1,2}[-/.]\\d{1,2}\\b|\\b\\d{1,2}[-/.]\\d{1,2}\\b|发布于|编辑于|昨天|今天|前\\b/.test(detailText);
-              const hasMetric = Array.from(document.querySelectorAll(metricSelectors)).filter(visible).some((el) => /\\d|赞|收藏|评论|分享/.test(clean(el)));
+              const metricTexts = Array.from(document.querySelectorAll(metricSelectors)).filter(visible).map((el) => clean(el)).filter(Boolean);
+              const numericMetricPattern = /\\b\\d+(?:\\.\\d+)?\\s*(?:万|千|w|W|k|K)?\\b/;
+              const labelOnlyMetricCount = metricTexts.filter((text) => /^(赞|点赞|收藏|评论|分享)$/.test(text)).length;
+              const hasNumericMetric = metricTexts.some((text) => numericMetricPattern.test(text));
               const hasTags = Array.from(document.querySelectorAll(tagSelectors)).filter(visible).some((el) => clean(el).replace(/^#/, ""));
-              const hasStrongDetailEvidence = Boolean(hasBody || hasPublishTime || hasMetric || hasTags || initialStateMatch);
+              const hasStrongDetailEvidence = Boolean(hasBody || hasPublishTime || hasNumericMetric || hasTags || initialStateMatch);
               let detailReadyReason = null;
               if (!noteRoots.length) {
                 detailReadyReason = "EMPTY_DETAIL_ROOT";
@@ -872,7 +880,10 @@ class Crawler:
                 engage_visible: visible(engage),
                 body_visible: hasBody,
                 publish_time_visible: hasPublishTime,
-                interact_metrics_visible: hasMetric,
+                interact_metrics_visible: hasNumericMetric,
+                numeric_metric_visible: hasNumericMetric,
+                label_only_metric_visible: labelOnlyMetricCount > 0,
+                label_only_metric_count: labelOnlyMetricCount,
                 tags_visible: hasTags,
                 exact_link_count: exactLinks.length,
                 initial_state_match: initialStateMatch,

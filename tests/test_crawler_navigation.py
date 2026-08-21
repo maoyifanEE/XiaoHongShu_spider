@@ -860,7 +860,7 @@ def test_detail_route_success_but_loading_state_is_not_ready(tmp_path: Path, mon
             )
             await page.goto(f"https://www.xiaohongshu.com/explore/{note_id}")
             result = await crawler._get_note_detail_evidence(page, note_id)
-            verified, reason, detail_count = await crawler._wait_for_target_note_detail(page, note_id, timeout_ms=100)
+            verified, reason, detail_count = await crawler._wait_for_target_note_detail(page, note_id, timeout_ms=1200)
             await browser.close()
             return result, verified, reason, detail_count
 
@@ -900,7 +900,7 @@ def test_detail_ready_with_title_and_metric(tmp_path: Path, monkeypatch):
             )
             await page.goto(f"https://www.xiaohongshu.com/explore/{note_id}")
             evidence = await crawler._get_note_detail_evidence(page, note_id)
-            verified, reason, detail_count = await crawler._wait_for_target_note_detail(page, note_id, timeout_ms=100)
+            verified, reason, detail_count = await crawler._wait_for_target_note_detail(page, note_id, timeout_ms=1200)
             await browser.close()
             return evidence, verified, reason, detail_count
 
@@ -938,12 +938,160 @@ def test_detail_ready_with_title_and_body(tmp_path: Path, monkeypatch):
             )
             await page.goto(f"https://www.xiaohongshu.com/explore/{note_id}")
             evidence = await crawler._get_note_detail_evidence(page, note_id)
-            verified, reason, detail_count = await crawler._wait_for_target_note_detail(page, note_id, timeout_ms=100)
+            verified, reason, detail_count = await crawler._wait_for_target_note_detail(page, note_id, timeout_ms=1200)
             await browser.close()
             return evidence, verified, reason, detail_count
 
     evidence, verified, reason, detail_count = asyncio.run(run())
     assert evidence["body_visible"] is True
+    assert verified is True
+    assert reason is None
+    assert detail_count == 1
+
+
+def test_label_only_metrics_do_not_make_detail_ready(tmp_path: Path, monkeypatch):
+    async def run():
+        crawler = Crawler(app_config(tmp_path), DummyDb(), DummyLogger())
+        note_id = "6a7b27e9000000003400c518"
+
+        async def no_safe_stop(*args, **kwargs):
+            return None
+
+        monkeypatch.setattr(crawler, "_raise_if_safe_stop", no_safe_stop)
+        async with async_playwright() as p:
+            browser = await p.chromium.launch(headless=True)
+            page = await browser.new_page()
+            await page.route(
+                "**/*",
+                lambda route: route.fulfill(
+                    status=200,
+                    content_type="text/html; charset=utf-8",
+                    body="""
+                    <main class="note-detail">
+                      <h1 id="detail-title">不来姨妈！别总怀疑得了多囊</h1>
+                      <div>加载中</div>
+                      <div class="engage-bar">
+                        <span class="collect-wrapper">收藏</span>
+                        <span class="chat-wrapper">评论</span>
+                        <span class="share-wrapper">分享</span>
+                      </div>
+                    </main>
+                    """,
+                ),
+            )
+            await page.goto(f"https://www.xiaohongshu.com/explore/{note_id}")
+            evidence = await crawler._get_note_detail_evidence(page, note_id)
+            verified, reason, detail_count = await crawler._wait_for_target_note_detail(page, note_id, timeout_ms=100)
+            await browser.close()
+            return evidence, verified, reason, detail_count
+
+    evidence, verified, reason, detail_count = asyncio.run(run())
+    assert evidence["title_visible"] is True
+    assert evidence["numeric_metric_visible"] is False
+    assert evidence["label_only_metric_visible"] is True
+    assert evidence["detail_ready_reason"] == "LOADING_STATE"
+    assert verified is False
+    assert reason == "DETAIL_NOT_READY"
+    assert detail_count == 1
+
+
+def test_hydrated_detail_with_numeric_metrics_and_tags_is_ready(tmp_path: Path, monkeypatch):
+    async def run():
+        crawler = Crawler(app_config(tmp_path), DummyDb(), DummyLogger())
+        note_id = "6a7b27e9000000003400c518"
+
+        async def no_safe_stop(*args, **kwargs):
+            return None
+
+        monkeypatch.setattr(crawler, "_raise_if_safe_stop", no_safe_stop)
+        async with async_playwright() as p:
+            browser = await p.chromium.launch(headless=True)
+            page = await browser.new_page()
+            await page.route(
+                "**/*",
+                lambda route: route.fulfill(
+                    status=200,
+                    content_type="text/html; charset=utf-8",
+                    body="""
+                    <main class="note-detail">
+                      <h1 id="detail-title">不来姨妈！别总怀疑得了多囊</h1>
+                      <div id="detail-desc">
+                        <a href="/search_result?keyword=a">#愿世界没有痛经</a>
+                        <a href="/search_result?keyword=b">#内分泌平衡</a>
+                        <a href="/search_result?keyword=c">#多囊</a>
+                      </div>
+                      <div>08-11 广东</div>
+                      <div class="engage-bar">
+                        <span class="like-wrapper"><span class="count">5</span></span>
+                        <span class="collect-wrapper"><span class="count">1</span></span>
+                        <span class="chat-wrapper">评论</span>
+                      </div>
+                    </main>
+                    """,
+                ),
+            )
+            await page.goto(f"https://www.xiaohongshu.com/explore/{note_id}")
+            evidence = await crawler._get_note_detail_evidence(page, note_id)
+            verified, reason, detail_count = await crawler._wait_for_target_note_detail(page, note_id, timeout_ms=1200)
+            await browser.close()
+            return evidence, verified, reason, detail_count
+
+    evidence, verified, reason, detail_count = asyncio.run(run())
+    assert evidence["numeric_metric_visible"] is True
+    assert evidence["tags_visible"] is True
+    assert evidence["publish_time_visible"] is True
+    assert verified is True
+    assert reason is None
+    assert detail_count == 1
+
+
+def test_target_detail_requires_two_consecutive_verified_polls(tmp_path: Path, monkeypatch):
+    crawler = Crawler(app_config(tmp_path), DummyDb(), DummyLogger())
+    note_id = "66dabcde000000001f01abcd"
+    states = [{"verified": True, "detail_root_count": 1}, {"verified": False, "detail_root_count": 1}]
+
+    class DetailPage:
+        url = f"https://www.xiaohongshu.com/explore/{note_id}"
+
+        async def wait_for_timeout(self, timeout):
+            pass
+
+    async def no_safe_stop(*args, **kwargs):
+        return None
+
+    async def evidence(*args, **kwargs):
+        if states:
+            return states.pop(0)
+        return {"verified": False, "detail_root_count": 1}
+
+    monkeypatch.setattr(crawler, "_raise_if_safe_stop", no_safe_stop)
+    monkeypatch.setattr(crawler, "_get_note_detail_evidence", evidence)
+    verified, reason, detail_count = asyncio.run(crawler._wait_for_target_note_detail(DetailPage(), note_id, timeout_ms=100))
+    assert verified is False
+    assert reason == "DETAIL_NOT_READY"
+    assert detail_count == 1
+
+
+def test_target_detail_passes_after_two_consecutive_verified_polls(tmp_path: Path, monkeypatch):
+    crawler = Crawler(app_config(tmp_path), DummyDb(), DummyLogger())
+    note_id = "66dabcde000000001f01abcd"
+    states = [{"verified": True, "detail_root_count": 1}, {"verified": True, "detail_root_count": 1}]
+
+    class DetailPage:
+        url = f"https://www.xiaohongshu.com/explore/{note_id}"
+
+        async def wait_for_timeout(self, timeout):
+            pass
+
+    async def no_safe_stop(*args, **kwargs):
+        return None
+
+    async def evidence(*args, **kwargs):
+        return states.pop(0) if states else {"verified": False, "detail_root_count": 1}
+
+    monkeypatch.setattr(crawler, "_raise_if_safe_stop", no_safe_stop)
+    monkeypatch.setattr(crawler, "_get_note_detail_evidence", evidence)
+    verified, reason, detail_count = asyncio.run(crawler._wait_for_target_note_detail(DetailPage(), note_id, timeout_ms=100))
     assert verified is True
     assert reason is None
     assert detail_count == 1

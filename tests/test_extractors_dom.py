@@ -164,6 +164,52 @@ def test_dom_tags_and_state_tags_are_merged():
     assert merged["field_sources"]["tags"] == "DOM_EXACT+INITIAL_STATE"
 
 
+def test_missing_desc_does_not_use_root_ui_text_as_body():
+    html = """
+    <main class="note-detail">
+      <h1 id="detail-title">标题</h1>
+      <div>作者</div>
+      <button>关注</button>
+      <div>加载中</div>
+      <div class="engage-bar">
+        <span class="collect-wrapper">收藏</span>
+        <span class="chat-wrapper">评论</span>
+      </div>
+    </main>
+    """
+    note = asyncio.run(_extract_from_html(html))
+    assert note["title"] == "标题"
+    assert note["body"] is None
+    assert "作者" not in (note["body"] or "")
+    assert note["field_sources"].get("body") == "MISSING"
+
+
+def test_missing_desc_does_not_extract_comment_hashtag_as_note_tag():
+    html = """
+    <main class="note-detail">
+      <h1 id="detail-title">标题</h1>
+      <section class="comment-item">用户A\n评论里的 #误提取</section>
+      <div class="engage-bar"><span class="like-wrapper"><span class="count">1</span></span></div>
+    </main>
+    """
+    note = asyncio.run(_extract_from_html(html))
+    assert note["body"] is None
+    assert note["hashtags"] == []
+    assert note["field_sources"].get("tags") == "MISSING"
+
+
+def test_structured_desc_still_fills_missing_dom_body():
+    note = _base_note()
+    note["title"] = "标题"
+    note["field_sources"] = {"title": "DOM_EXACT"}
+    merged = merge_note_with_structured(
+        note,
+        {"note_id": NOTE_ID, "desc": "结构化正文", "_field_sources": {"body": "DETAIL_INITIAL_STATE"}},
+    )
+    assert merged["body"] == "结构化正文"
+    assert merged["field_sources"]["body"] == "DETAIL_INITIAL_STATE"
+
+
 async def _extract_from_html(html: str):
     async with async_playwright() as p:
         browser = await p.chromium.launch(headless=True)

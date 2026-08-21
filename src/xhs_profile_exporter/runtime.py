@@ -22,8 +22,13 @@ class OpenNoteResult:
     note_id: str
     strategy: str
     target_verified: bool
+    detail_ready: bool | None = None
     detail_kind: str | None = None
     reason: str | None = None
+
+    def __post_init__(self) -> None:
+        if self.detail_ready is None:
+            self.detail_ready = self.target_verified
 
 
 @dataclass

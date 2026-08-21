@@ -833,6 +833,149 @@ def test_unavailable_shell_is_not_verified(tmp_path: Path, monkeypatch):
     assert reason == "DETAIL_NOT_READY"
 
 
+def test_detail_route_success_but_loading_state_is_not_ready(tmp_path: Path, monkeypatch):
+    async def run():
+        crawler = Crawler(app_config(tmp_path), DummyDb(), DummyLogger())
+        note_id = "6a7b27e9000000003400c518"
+
+        async def no_safe_stop(*args, **kwargs):
+            return None
+
+        monkeypatch.setattr(crawler, "_raise_if_safe_stop", no_safe_stop)
+        async with async_playwright() as p:
+            browser = await p.chromium.launch(headless=True)
+            page = await browser.new_page()
+            await page.route(
+                "**/*",
+                lambda route: route.fulfill(
+                    status=200,
+                    content_type="text/html; charset=utf-8",
+                    body="""
+                    <main class="note-detail">
+                      <h1 id="detail-title">不来姨妈！别总怀疑得了多囊</h1>
+                      <div>加载中</div>
+                    </main>
+                    """,
+                ),
+            )
+            await page.goto(f"https://www.xiaohongshu.com/explore/{note_id}")
+            result = await crawler._get_note_detail_evidence(page, note_id)
+            verified, reason, detail_count = await crawler._wait_for_target_note_detail(page, note_id, timeout_ms=100)
+            await browser.close()
+            return result, verified, reason, detail_count
+
+    evidence, verified, reason, detail_count = asyncio.run(run())
+    assert evidence["title_visible"] is True
+    assert evidence["loading_visible"] is True
+    assert evidence["detail_ready_reason"] == "LOADING_STATE"
+    assert verified is False
+    assert reason == "DETAIL_NOT_READY"
+    assert detail_count == 1
+
+
+def test_detail_ready_with_title_and_metric(tmp_path: Path, monkeypatch):
+    async def run():
+        crawler = Crawler(app_config(tmp_path), DummyDb(), DummyLogger())
+        note_id = "66dabcde000000001f01abcd"
+
+        async def no_safe_stop(*args, **kwargs):
+            return None
+
+        monkeypatch.setattr(crawler, "_raise_if_safe_stop", no_safe_stop)
+        async with async_playwright() as p:
+            browser = await p.chromium.launch(headless=True)
+            page = await browser.new_page()
+            await page.route(
+                "**/*",
+                lambda route: route.fulfill(
+                    status=200,
+                    content_type="text/html; charset=utf-8",
+                    body="""
+                    <main class="note-detail">
+                      <h1 id="detail-title">标题</h1>
+                      <div class="engage-bar"><span class="like-wrapper"><span class="count">12</span></span></div>
+                    </main>
+                    """,
+                ),
+            )
+            await page.goto(f"https://www.xiaohongshu.com/explore/{note_id}")
+            evidence = await crawler._get_note_detail_evidence(page, note_id)
+            verified, reason, detail_count = await crawler._wait_for_target_note_detail(page, note_id, timeout_ms=100)
+            await browser.close()
+            return evidence, verified, reason, detail_count
+
+    evidence, verified, reason, detail_count = asyncio.run(run())
+    assert evidence["interact_metrics_visible"] is True
+    assert verified is True
+    assert reason is None
+    assert detail_count == 1
+
+
+def test_detail_ready_with_title_and_body(tmp_path: Path, monkeypatch):
+    async def run():
+        crawler = Crawler(app_config(tmp_path), DummyDb(), DummyLogger())
+        note_id = "66dabcde000000001f01abcd"
+
+        async def no_safe_stop(*args, **kwargs):
+            return None
+
+        monkeypatch.setattr(crawler, "_raise_if_safe_stop", no_safe_stop)
+        async with async_playwright() as p:
+            browser = await p.chromium.launch(headless=True)
+            page = await browser.new_page()
+            await page.route(
+                "**/*",
+                lambda route: route.fulfill(
+                    status=200,
+                    content_type="text/html; charset=utf-8",
+                    body="""
+                    <main class="note-detail">
+                      <h1 id="detail-title">标题</h1>
+                      <div id="detail-desc">这里是已经加载完成的正文</div>
+                    </main>
+                    """,
+                ),
+            )
+            await page.goto(f"https://www.xiaohongshu.com/explore/{note_id}")
+            evidence = await crawler._get_note_detail_evidence(page, note_id)
+            verified, reason, detail_count = await crawler._wait_for_target_note_detail(page, note_id, timeout_ms=100)
+            await browser.close()
+            return evidence, verified, reason, detail_count
+
+    evidence, verified, reason, detail_count = asyncio.run(run())
+    assert evidence["body_visible"] is True
+    assert verified is True
+    assert reason is None
+    assert detail_count == 1
+
+
+def test_detail_not_ready_does_not_export(tmp_path: Path, monkeypatch):
+    db = DummyDb()
+    crawler = Crawler(app_config(tmp_path), db, DummyLogger())
+    page = FakePage()
+    creator = app_config(tmp_path).creators[0]
+    note_id = "6a7b27e9000000003400c518"
+
+    async def fake_open(page, profile_url, card, budget):
+        return OpenNoteResult(
+            page=page,
+            note_id=card["note_id"],
+            strategy="test",
+            target_verified=False,
+            detail_ready=False,
+            detail_kind="route_not_ready",
+            reason="DETAIL_NOT_READY",
+        )
+
+    monkeypatch.setattr(crawler, "_open_note_from_profile", fake_open)
+    monkeypatch.setattr(crawler, "_save_error_screenshot", lambda *args, **kwargs: _noop_async())
+    result = asyncio.run(crawler._collect_notes(page, creator, [{"note_id": note_id}], _checkpoint(tmp_path), crawler._build_budget()))
+    assert result.non_exportable_ids == [note_id]
+    assert result.navigation_failed_ids == []
+    assert result.exportable_ids == []
+    assert db.saved_notes == []
+
+
 def test_navigation_failures_stop_after_budget(tmp_path: Path, monkeypatch):
     db = DummyDb()
     crawler = Crawler(app_config(tmp_path), db, DummyLogger())

@@ -320,6 +320,18 @@ class Crawler:
                 page = open_result.page
                 result.count_navigation_strategy(open_result.strategy)
                 await self._raise_if_safe_stop(page, "note_after_open", note_id)
+                if open_result.reason == "DETAIL_NOT_READY" and not open_result.detail_ready:
+                    result.non_exportable_ids.append(note_id)
+                    self.logger.info(
+                        "NOTE attempt_result note_id=%s result=DETAIL_NOT_READY strategy=%s detail_kind=%s reason=%s navigation_success=true detail_ready=false",
+                        note_id,
+                        open_result.strategy,
+                        open_result.detail_kind,
+                        open_result.reason,
+                    )
+                    checkpoint.failed_note_ids = sorted(set(checkpoint.failed_note_ids) | {note_id})
+                    checkpoint.save(self.app_config.base_dir / "data" / "checkpoints")
+                    continue
                 if not open_result.target_verified:
                     errors += 1
                     result.navigation_failed_ids.append(note_id)
@@ -460,7 +472,8 @@ class Crawler:
                     note_id=note_id,
                     strategy=click_strategy,
                     target_verified=verified,
-                    detail_kind="route_and_detail_root" if verified else None,
+                    detail_ready=verified,
+                    detail_kind="route_and_detail_ready" if verified else ("route_not_ready" if reason == "DETAIL_NOT_READY" else None),
                     reason=None if verified else reason,
                 )
             self.logger.info(
@@ -507,7 +520,8 @@ class Crawler:
                 note_id=note_id,
                 strategy=strategy,
                 target_verified=verified,
-                detail_kind="route_and_detail_root" if verified else None,
+                detail_ready=verified,
+                detail_kind="route_and_detail_ready" if verified else ("route_not_ready" if reason == "DETAIL_NOT_READY" else None),
                 reason=None if verified else reason,
             )
         except SafeStopRequested:
@@ -624,12 +638,15 @@ class Crawler:
             if wrong_route:
                 return False, "TARGET_MISMATCH", detail_count
             if route_match:
-                last_reason = "DETAIL_NOT_READY"
+                last_reason = str(evidence.get("detail_ready_reason") or "DETAIL_NOT_READY")
             elif detail_count > 0:
                 last_reason = "TARGET_NOT_VERIFIED"
             else:
                 last_reason = "CLICK_NO_STATE_CHANGE"
             await page.wait_for_timeout(500)
+        if last_reason in {"DETAIL_NOT_READY", "LOADING_STATE", "NO_DETAIL_EVIDENCE", "EMPTY_DETAIL_ROOT"}:
+            self.logger.info("DETAIL_READINESS_FAILED note_id=%s reason=%s detail_root_count=%s", note_id, last_reason, last_detail_count)
+            last_reason = "DETAIL_NOT_READY"
         return False, last_reason, last_detail_count
 
     async def _verify_target_note(self, page: Page, note_id: str) -> bool:
@@ -652,13 +669,18 @@ class Crawler:
                 return rect.width > 0 && rect.height > 0 && style.display !== "none" && style.visibility !== "hidden";
               };
               const unavailableWords = ["当前笔记暂时无法浏览", "暂时无法浏览", "笔记不存在", "内容不存在", "已被删除"];
-              const bodyText = document.body ? document.body.innerText || "" : "";
+              const loadingWords = ["加载中"];
+              const bodyText = document.body ? (document.body.innerText || document.body.textContent || "") : "";
               const unavailable = unavailableWords.some((word) => bodyText.includes(word));
+              const loadingVisible = loadingWords.some((word) => bodyText.includes(word));
               const title = document.querySelector("#detail-title");
               const desc = document.querySelector("#detail-desc");
               const engage = document.querySelector(".engage-bar, [class*=engage], [class*=interaction], [class*=Interact]");
+              const metricSelectors = ".engage-bar .count, .engage-bar [class*=count], .engage-bar [class*=Count], .engage-bar [class*=like], .engage-bar [class*=Like], .engage-bar [class*=collect], .engage-bar [class*=Collect], .engage-bar [class*=comment], .engage-bar [class*=Comment], .engage-bar [class*=share], .engage-bar [class*=Share]";
+              const tagSelectors = '#detail-desc a[href*="search"], #detail-desc a[href*="search_result"], a[href*="/search_result"], a[href*="/search"]';
               const noteRoots = Array.from(document.querySelectorAll('[class*="note-detail"], [class*="noteDetail"], [class*="NoteDetail"], [data-testid*="note-detail"], [role="dialog"]')).filter(visible);
               const exactLinks = noteId ? Array.from(document.querySelectorAll(`a[href*="${noteId}"]`)).filter(visible) : [];
+              const clean = (el) => el ? String(el.innerText || el.textContent || "").trim() : "";
               const hasInitialStateNote = (root) => {
                 if (!noteId || !root || typeof root !== "object") return false;
                 const seen = new Set();
@@ -669,7 +691,17 @@ class Crawler:
                   scanned += 1;
                   if (!value || typeof value !== "object" || seen.has(value)) continue;
                   seen.add(value);
-                  if ((value.note_id === noteId || value.id === noteId) && (value.title || value.display_title || value.desc || value.content)) return true;
+                  const matched = value.note_id === noteId || value.noteId === noteId || value.id === noteId;
+                  if (matched) {
+                    const interact = value.interactInfo && typeof value.interactInfo === "object" ? value.interactInfo : {};
+                    const hasStructuredDetail = Boolean(
+                      value.desc || value.content || value.time || value.create_time || value.createTime ||
+                      value.tagList || value.tags ||
+                      value.likedCount || value.liked_count || value.collectedCount || value.collected_count || value.commentCount || value.comment_count || value.shareCount || value.share_count ||
+                      interact.likedCount || interact.liked_count || interact.collectedCount || interact.collected_count || interact.commentCount || interact.comment_count || interact.shareCount || interact.share_count
+                    );
+                    if (hasStructuredDetail) return true;
+                  }
                   let children = [];
                   try { children = Object.values(value); } catch { children = []; }
                   for (const child of children) {
@@ -683,14 +715,36 @@ class Crawler:
                 return !unavailable && (!noteId || text.includes(noteId) || Boolean(el.querySelector(`a[href*="${noteId}"]`)) || visible(title) || visible(desc));
               });
               const initialStateMatch = hasInitialStateNote(window.__INITIAL_STATE__);
+              const titleText = clean(title);
+              const descText = clean(desc);
+              const hasBody = visible(desc) && descText && descText !== titleText && !loadingWords.includes(descText);
+              const detailText = noteRoots.map((el) => el.innerText || "").join("\\n");
+              const hasPublishTime = /\\b\\d{4}[-/.]\\d{1,2}[-/.]\\d{1,2}\\b|\\b\\d{1,2}[-/.]\\d{1,2}\\b|发布于|编辑于|昨天|今天|前\\b/.test(detailText);
+              const hasMetric = Array.from(document.querySelectorAll(metricSelectors)).filter(visible).some((el) => /\\d|赞|收藏|评论|分享/.test(clean(el)));
+              const hasTags = Array.from(document.querySelectorAll(tagSelectors)).filter(visible).some((el) => clean(el).replace(/^#/, ""));
+              const hasStrongDetailEvidence = Boolean(hasBody || hasPublishTime || hasMetric || hasTags || initialStateMatch);
+              let detailReadyReason = null;
+              if (!noteRoots.length) {
+                detailReadyReason = "EMPTY_DETAIL_ROOT";
+              } else if (loadingVisible && !hasStrongDetailEvidence) {
+                detailReadyReason = "LOADING_STATE";
+              } else if (!visible(title) || !hasStrongDetailEvidence) {
+                detailReadyReason = "NO_DETAIL_EVIDENCE";
+              }
               const independentSignals = [visible(title), visible(desc), visible(engage), exactLinks.length > 0, initialStateMatch].filter(Boolean).length;
               return {
-                verified: Boolean(!unavailable && (strongRoot || independentSignals >= 2)),
+                verified: Boolean(!unavailable && strongRoot && visible(title) && hasStrongDetailEvidence && !detailReadyReason),
                 unavailable,
                 detail_root_count: noteRoots.length,
+                detail_ready_reason: detailReadyReason,
+                loading_visible: loadingVisible,
                 title_visible: visible(title),
                 desc_visible: visible(desc),
                 engage_visible: visible(engage),
+                body_visible: hasBody,
+                publish_time_visible: hasPublishTime,
+                interact_metrics_visible: hasMetric,
+                tags_visible: hasTags,
                 exact_link_count: exactLinks.length,
                 initial_state_match: initialStateMatch,
                 independent_signals: independentSignals,

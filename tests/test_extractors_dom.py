@@ -108,7 +108,9 @@ def test_scoped_empty_comment_state_infers_exact_zero():
       <div class="engage-bar">
         <div class="chat-wrapper"><span class="count">评论</span></div>
       </div>
-      <div class="comments-empty">这是一片荒地点击评论</div>
+      <div class="comments-container">
+        <div class="empty">这是一片荒地点击评论</div>
+      </div>
     </section>
     """
     note = asyncio.run(_extract_from_html(html))
@@ -118,6 +120,28 @@ def test_scoped_empty_comment_state_infers_exact_zero():
     assert note["field_sources"].get("comment_count") == "DOM_EXACT"
     assert note["comment_zero_evidence"] is True
     assert note["comment_zero_evidence_text"] == "这是一片荒地点击评论"
+    assert note["comment_area_found"] is True
+    assert note["comment_area_selector"] == "div.comments-container"
+
+
+def test_scoped_no_comments_text_in_comment_area_infers_exact_zero():
+    html = """
+    <section class="note-detail" style="display:block;width:800px;height:600px">
+      <h1 id="detail-title">目标标题</h1>
+      <div id="detail-desc">目标正文</div>
+      <div class="engage-bar">
+        <div class="chat-wrapper"><span class="count">评论</span></div>
+      </div>
+      <div class="comments-list">
+        <span class="placeholder">暂无评论</span>
+      </div>
+    </section>
+    """
+    note = asyncio.run(_extract_from_html(html))
+    assert note["comments_value"] == 0
+    assert note["comments_raw"] == "0"
+    assert note["field_sources"].get("comment_count") == "DOM_EXACT"
+    assert note["comment_zero_evidence"] is True
 
 
 def test_numeric_comment_metric_wins_without_empty_state():
@@ -150,6 +174,22 @@ def test_empty_comment_text_outside_detail_root_does_not_infer_zero():
     assert note["comments_value"] is None
     assert note["field_sources"].get("comment_count") == "MISSING"
     assert note["comment_zero_evidence"] is False
+
+
+def test_empty_comment_text_in_body_does_not_infer_zero():
+    html = """
+    <section class="note-detail" style="display:block;width:800px;height:600px">
+      <h1 id="detail-title">测试</h1>
+      <div id="detail-desc">今天页面一直显示“暂无评论”，记录一下。</div>
+      <div class="engage-bar">
+        <div class="chat-wrapper"><span class="count">评论</span></div>
+      </div>
+    </section>
+    """
+    note = asyncio.run(_extract_from_html(html))
+    assert note["comment_zero_evidence"] is False
+    assert note["comments_value"] is None
+    assert note["field_sources"].get("comment_count") == "MISSING"
 
 
 def test_sidebar_fake_count_does_not_pollute_note_metrics():

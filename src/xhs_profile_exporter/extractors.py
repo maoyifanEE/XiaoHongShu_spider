@@ -166,6 +166,40 @@ async def extract_note_dom(page: Any, note_id: str, top_n: int = 3) -> dict[str,
             const count = el ? el.querySelector(".count, [class*=count], [class*=Count]") : null;
             return clean(count || el);
           };
+          const describeSelector = (el) => {
+            if (!el) return "";
+            if (el.id) return `#${el.id}`;
+            const testId = el.getAttribute("data-testid");
+            if (testId) return `[data-testid="${testId}"]`;
+            const className = typeof el.className === "string" ? el.className.trim().split(/\\s+/).slice(0, 3).join(".") : "";
+            return className ? `${el.tagName.toLowerCase()}.${className}` : el.tagName.toLowerCase();
+          };
+          const findCommentAreaRoot = () => {
+            const selectors = [
+              '[class*="comments-container"]',
+              '[class*="commentsContainer"]',
+              '[class*="CommentsContainer"]',
+              '[class*="comments-list"]',
+              '[class*="commentsList"]',
+              '[class*="CommentsList"]',
+              '[class*="comment-list"]',
+              '[class*="commentList"]',
+              '[class*="CommentList"]',
+              '[class*="comments-el"]',
+              '[class*="commentsEl"]',
+              '[class*="CommentsEl"]',
+              '[data-testid*="comments"]',
+              '[data-testid*="comment-list"]'
+            ];
+            const candidates = Array.from(root.querySelectorAll(selectors.join(','))).filter((el) => {
+              if (!visible(el)) return false;
+              if (el.closest('.engage-bar, [class*=engage-bar], [class*=EngageBar]')) return false;
+              const text = clean(el);
+              return text.length > 0 && text.length <= 5000;
+            });
+            candidates.sort((a, b) => clean(a).length - clean(b).length);
+            return {el: candidates[0] || null, selectors};
+          };
           const domMetrics = {
             likes: metricText([".engage-bar .like-wrapper", ".engage-bar [class*=like-wrapper]", ".engage-bar [class*=likeWrapper]", ".engage-bar [class*=Like]"]),
             collects: metricText([".engage-bar .collect-wrapper", ".engage-bar [class*=collect-wrapper]", ".engage-bar [class*=collectWrapper]", ".engage-bar [class*=Collect]"]),
@@ -186,23 +220,14 @@ async def extract_note_dom(page: Any, note_id: str, top_n: int = 3) -> dict[str,
              };
           });
           const zeroCommentWords = ["这是一片荒地", "暂无评论", "还没有评论"];
-          const zeroCommentSelectors = [
-            '[class*=comment]',
-            '[class*=Comment]',
-            '[data-testid*=comment]',
-            '[class*=empty]',
-            '[class*=Empty]',
-            '[class*=placeholder]',
-            '[class*=Placeholder]',
-            'p',
-            'div',
-            'span'
-          ].join(',');
-          const zeroCommentEvidenceText = Array.from(root.querySelectorAll(zeroCommentSelectors))
+          const commentArea = findCommentAreaRoot();
+          const zeroCommentSelectors = '[class*=empty], [class*=Empty], [class*=placeholder], [class*=Placeholder], [data-testid*=empty], [data-testid*=placeholder]';
+          const zeroCommentEvidenceText = commentArea.el ? Array.from(commentArea.el.querySelectorAll(zeroCommentSelectors))
+            .concat([commentArea.el])
             .filter(visible)
             .map((el) => clean(el))
             .filter((text) => text && text.length <= 200 && zeroCommentWords.some((word) => text.includes(word)))
-            .sort((a, b) => a.length - b.length)[0] || "";
+            .sort((a, b) => a.length - b.length)[0] || "" : "";
           return {
             rootFound: true,
             rootReason: evidenceRoot ? "DETAIL_EVIDENCE_ROOT" : "DETAIL_WRAPPER_ROOT",
@@ -212,6 +237,8 @@ async def extract_note_dom(page: Any, note_id: str, top_n: int = 3) -> dict[str,
             domMetrics,
             commentZeroEvidence: Boolean(zeroCommentEvidenceText),
             commentZeroEvidenceText: zeroCommentEvidenceText,
+            commentAreaFound: Boolean(commentArea.el),
+            commentAreaSelector: describeSelector(commentArea.el),
             tagNames,
             meta,
             comments,
@@ -253,9 +280,13 @@ async def extract_note_dom(page: Any, note_id: str, top_n: int = 3) -> dict[str,
             "root_reason": data.get("rootReason"),
             "comment_zero_evidence": bool(data.get("commentZeroEvidence")),
             "comment_zero_evidence_text": (data.get("commentZeroEvidenceText") or "")[:200],
+            "comment_area_found": bool(data.get("commentAreaFound")),
+            "comment_area_selector": data.get("commentAreaSelector") or "",
         },
         "comment_zero_evidence": bool(data.get("commentZeroEvidence")),
         "comment_zero_evidence_text": (data.get("commentZeroEvidenceText") or "")[:200],
+        "comment_area_found": bool(data.get("commentAreaFound")),
+        "comment_area_selector": data.get("commentAreaSelector") or "",
         "source": "dom",
         "field_sources": _note_field_sources(
             {

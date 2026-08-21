@@ -37,14 +37,14 @@
           "detail root text/meta"
         ],
         "matched_count": 1,
-        "text": "请刷新试试\n辣香郭\n关注\n不来姨妈！别总怀疑得了多囊\n#愿世界没有痛经 #内分泌平衡 #多囊\n猜你想搜\n多囊有什么危害\n08-11 广东\n\n这是一片荒地点击评论\n\n说点什么...\n5\n1\n可以添加到收藏夹啦\n评论\n发送\n取消"
+        "text": "请刷新试试\n辣香郭\n关注\n不来姨妈！别总怀疑得了多囊\n#愿世界没有痛经 #内分泌平衡 #多囊\n猜你想搜\n多囊怎么检查\n08-11 广东\n\n这是一片荒地点击评论\n\n说点什么...\n5\n1\n评论\n发送\n取消"
       },
       "publish_time": {
         "selectors_checked": [
           "detail root text"
         ],
         "matched_count": 1,
-        "text": "请刷新试试\n辣香郭\n关注\n不来姨妈！别总怀疑得了多囊\n#愿世界没有痛经 #内分泌平衡 #多囊\n猜你想搜\n多囊有什么危害\n08-11 广东\n\n这是一片荒地点击评论\n\n说点什么...\n5\n1\n可以添加到收藏夹啦\n评论\n发送\n取消"
+        "text": "请刷新试试\n辣香郭\n关注\n不来姨妈！别总怀疑得了多囊\n#愿世界没有痛经 #内分泌平衡 #多囊\n猜你想搜\n多囊怎么检查\n08-11 广东\n\n这是一片荒地点击评论\n\n说点什么...\n5\n1\n评论\n发送\n取消"
       },
       "like_count": {
         "selectors_checked": [
@@ -77,17 +77,75 @@
         "matched_count": 1,
         "text": "评论",
         "zero_comment_evidence": {
+          "comment_area_found": true,
+          "comment_area_selector": "div.comments-el",
+          "comment_area_selectors_checked": [
+            "[class*=\"comments-container\"]",
+            "[class*=\"commentsContainer\"]",
+            "[class*=\"CommentsContainer\"]",
+            "[class*=\"comments-list\"]",
+            "[class*=\"commentsList\"]",
+            "[class*=\"CommentsList\"]",
+            "[class*=\"comment-list\"]",
+            "[class*=\"commentList\"]",
+            "[class*=\"CommentList\"]",
+            "[class*=\"comments-el\"]",
+            "[class*=\"commentsEl\"]",
+            "[class*=\"CommentsEl\"]",
+            "[data-testid*=\"comments\"]",
+            "[data-testid*=\"comment-list\"]"
+          ],
+          "comment_area_node": {
+            "tag": "div",
+            "id": "",
+            "class": "comments-el",
+            "data_testid": "",
+            "role": ""
+          },
+          "comment_area_ancestors": [
+            {
+              "tag": "div",
+              "id": "",
+              "class": "comments-el",
+              "data_testid": "",
+              "role": ""
+            },
+            {
+              "tag": "div",
+              "id": "",
+              "class": "note-scroller",
+              "data_testid": "",
+              "role": ""
+            },
+            {
+              "tag": "div",
+              "id": "",
+              "class": "interaction-container",
+              "data_testid": "",
+              "role": ""
+            },
+            {
+              "tag": "div",
+              "id": "noteContainer",
+              "class": "note-container",
+              "data_testid": "",
+              "role": ""
+            },
+            {
+              "tag": "div",
+              "id": "",
+              "class": "note-detail-mask",
+              "data_testid": "",
+              "role": ""
+            }
+          ],
           "selectors_checked": [
-            "[class*=comment]",
-            "[class*=Comment]",
-            "[data-testid*=comment]",
             "[class*=empty]",
             "[class*=Empty]",
             "[class*=placeholder]",
             "[class*=Placeholder]",
-            "p",
-            "div",
-            "span"
+            "[data-testid*=empty]",
+            "[data-testid*=placeholder]"
           ],
           "matched_count": 1,
           "text": "这是一片荒地点击评论"
@@ -152,14 +210,14 @@
           "detail root text/meta"
         ],
         "matched_count": 1,
-        "text": "请刷新试试\n辣香郭\n关注\n不来姨妈！别总怀疑得了多囊\n#愿世界没有痛经 #内分泌平衡 #多囊\n猜你想搜\n多囊有什么危害\n08-11 广东\n\n这是一片荒地点击评论\n\n说点什么...\n5\n1\n可以添加到收藏夹啦\n评论\n发送\n取消"
+        "text": "请刷新试试\n辣香郭\n关注\n不来姨妈！别总怀疑得了多囊\n#愿世界没有痛经 #内分泌平衡 #多囊\n猜你想搜\n多囊怎么检查\n08-11 广东\n\n这是一片荒地点击评论\n\n说点什么...\n5\n1\n评论\n发送\n取消"
       },
       "publish_time": {
         "selectors_checked": [
           "detail root text"
         ],
         "matched_count": 1,
-        "text": "请刷新试试\n辣香郭\n关注\n不来姨妈！别总怀疑得了多囊\n#愿世界没有痛经 #内分泌平衡 #多囊\n猜你想搜\n多囊有什么危害\n08-11 广东\n\n这是一片荒地点击评论\n\n说点什么...\n5\n1\n可以添加到收藏夹啦\n评论\n发送\n取消"
+        "text": "请刷新试试\n辣香郭\n关注\n不来姨妈！别总怀疑得了多囊\n#愿世界没有痛经 #内分泌平衡 #多囊\n猜你想搜\n多囊怎么检查\n08-11 广东\n\n这是一片荒地点击评论\n\n说点什么...\n5\n1\n评论\n发送\n取消"
       },
       "like_count": {
         "selectors_checked": [
@@ -192,17 +250,75 @@
         "matched_count": 1,
         "text": "评论",
         "zero_comment_evidence": {
+          "comment_area_found": true,
+          "comment_area_selector": "div.comments-el",
+          "comment_area_selectors_checked": [
+            "[class*=\"comments-container\"]",
+            "[class*=\"commentsContainer\"]",
+            "[class*=\"CommentsContainer\"]",
+            "[class*=\"comments-list\"]",
+            "[class*=\"commentsList\"]",
+            "[class*=\"CommentsList\"]",
+            "[class*=\"comment-list\"]",
+            "[class*=\"commentList\"]",
+            "[class*=\"CommentList\"]",
+            "[class*=\"comments-el\"]",
+            "[class*=\"commentsEl\"]",
+            "[class*=\"CommentsEl\"]",
+            "[data-testid*=\"comments\"]",
+            "[data-testid*=\"comment-list\"]"
+          ],
+          "comment_area_node": {
+            "tag": "div",
+            "id": "",
+            "class": "comments-el",
+            "data_testid": "",
+            "role": ""
+          },
+          "comment_area_ancestors": [
+            {
+              "tag": "div",
+              "id": "",
+              "class": "comments-el",
+              "data_testid": "",
+              "role": ""
+            },
+            {
+              "tag": "div",
+              "id": "",
+              "class": "note-scroller",
+              "data_testid": "",
+              "role": ""
+            },
+            {
+              "tag": "div",
+              "id": "",
+              "class": "interaction-container",
+              "data_testid": "",
+              "role": ""
+            },
+            {
+              "tag": "div",
+              "id": "noteContainer",
+              "class": "note-container",
+              "data_testid": "",
+              "role": ""
+            },
+            {
+              "tag": "div",
+              "id": "",
+              "class": "note-detail-mask",
+              "data_testid": "",
+              "role": ""
+            }
+          ],
           "selectors_checked": [
-            "[class*=comment]",
-            "[class*=Comment]",
-            "[data-testid*=comment]",
             "[class*=empty]",
             "[class*=Empty]",
             "[class*=placeholder]",
             "[class*=Placeholder]",
-            "p",
-            "div",
-            "span"
+            "[data-testid*=empty]",
+            "[data-testid*=placeholder]"
           ],
           "matched_count": 1,
           "text": "这是一片荒地点击评论"

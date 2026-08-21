@@ -83,6 +83,8 @@ def normalized_extraction_from_note(note: dict[str, Any]) -> dict[str, dict[str,
         comment_evidence = {
             "zero_comment_evidence": True,
             "zero_comment_evidence_text": (note.get("comment_zero_evidence_text") or "")[:200],
+            "comment_area_found": bool(note.get("comment_area_found")),
+            "comment_area_selector": note.get("comment_area_selector") or "",
         }
     return {
         "title": _field(note.get("title"), sources.get("title")),
@@ -342,27 +344,70 @@ async def capture_detail_review_state(page: Any, note_id: str) -> dict[str, Any]
             const count = el ? el.querySelector(".count, [class*=count], [class*=Count]") : null;
             return {selectors_checked: selectors, matched_count: el ? 1 : 0, text: clean(count || el)};
           };
+          const describeNode = (el) => el ? {
+            tag: el.tagName.toLowerCase(),
+            id: el.id || "",
+            class: typeof el.className === "string" ? el.className : "",
+            data_testid: el.getAttribute("data-testid") || "",
+            role: el.getAttribute("role") || ""
+          } : null;
+          const describeSelector = (el) => {
+            if (!el) return "";
+            if (el.id) return `#${el.id}`;
+            const testId = el.getAttribute("data-testid");
+            if (testId) return `[data-testid="${testId}"]`;
+            const className = typeof el.className === "string" ? el.className.trim().split(/\\s+/).slice(0, 3).join(".") : "";
+            return className ? `${el.tagName.toLowerCase()}.${className}` : el.tagName.toLowerCase();
+          };
+          const findCommentAreaRoot = () => {
+            if (!root) return {el: null, selectors: []};
+            const selectors = [
+              '[class*="comments-container"]',
+              '[class*="commentsContainer"]',
+              '[class*="CommentsContainer"]',
+              '[class*="comments-list"]',
+              '[class*="commentsList"]',
+              '[class*="CommentsList"]',
+              '[class*="comment-list"]',
+              '[class*="commentList"]',
+              '[class*="CommentList"]',
+              '[class*="comments-el"]',
+              '[class*="commentsEl"]',
+              '[class*="CommentsEl"]',
+              '[data-testid*="comments"]',
+              '[data-testid*="comment-list"]'
+            ];
+            const candidates = Array.from(root.querySelectorAll(selectors.join(','))).filter((el) => {
+              if (!visible(el)) return false;
+              if (el.closest('.engage-bar, [class*=engage-bar], [class*=EngageBar]')) return false;
+              const text = clean(el);
+              return text.length > 0 && text.length <= 5000;
+            });
+            candidates.sort((a, b) => clean(a).length - clean(b).length);
+            return {el: candidates[0] || null, selectors};
+          };
           const zeroCommentWords = ["这是一片荒地", "暂无评论", "还没有评论"];
           const zeroCommentEvidence = () => {
-            if (!root) return {selectors_checked: [], matched_count: 0, text: ""};
-            const selectors = [
-              '[class*=comment]',
-              '[class*=Comment]',
-              '[data-testid*=comment]',
-              '[class*=empty]',
-              '[class*=Empty]',
-              '[class*=placeholder]',
-              '[class*=Placeholder]',
-              'p',
-              'div',
-              'span'
-            ];
-            const text = Array.from(root.querySelectorAll(selectors.join(',')))
+            const commentArea = findCommentAreaRoot();
+            const selectors = ['[class*=empty]', '[class*=Empty]', '[class*=placeholder]', '[class*=Placeholder]', '[data-testid*=empty]', '[data-testid*=placeholder]'];
+            const ancestors = [];
+            let cursor = commentArea.el;
+            for (let i = 0; cursor && i < 6; i += 1) {
+              ancestors.push(describeNode(cursor));
+              cursor = cursor.parentElement && root.contains(cursor.parentElement) ? cursor.parentElement : null;
+            }
+            const text = commentArea.el ? Array.from(commentArea.el.querySelectorAll(selectors.join(',')))
+              .concat([commentArea.el])
               .filter(visible)
               .map((el) => clean(el))
               .filter((candidate) => candidate && candidate.length <= 200 && zeroCommentWords.some((word) => candidate.includes(word)))
-              .sort((a, b) => a.length - b.length)[0] || "";
+              .sort((a, b) => a.length - b.length)[0] || "" : "";
             return {
+              comment_area_found: Boolean(commentArea.el),
+              comment_area_selector: describeSelector(commentArea.el),
+              comment_area_selectors_checked: commentArea.selectors,
+              comment_area_node: describeNode(commentArea.el),
+              comment_area_ancestors: ancestors,
               selectors_checked: selectors,
               matched_count: text ? 1 : 0,
               text

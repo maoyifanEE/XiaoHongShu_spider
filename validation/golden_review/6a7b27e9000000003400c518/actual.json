@@ -34,7 +34,9 @@
       "source": "DOM_EXACT",
       "raw_display": "0",
       "zero_comment_evidence": true,
-      "zero_comment_evidence_text": "这是一片荒地点击评论"
+      "zero_comment_evidence_text": "这是一片荒地点击评论",
+      "comment_area_found": true,
+      "comment_area_selector": "div.comments-el"
     },
     "share_count": {
       "value": null,

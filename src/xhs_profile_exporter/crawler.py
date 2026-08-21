@@ -32,6 +32,11 @@ from .runtime import CollectionResult, OpenNoteResult, RunBudget, SafeStopReques
 from .state import LoginStatus, RunStatus
 from .time_utils import now_iso
 from .utils import is_sensitive_key, parse_count, sanitize_json, sanitize_url
+from .validation_artifacts import (
+    build_detail_not_ready_validation_note,
+    build_validation_note,
+    write_live_validation_artifact,
+)
 
 
 MAX_STRUCTURED_NODES_PER_RESPONSE = 5000
@@ -149,6 +154,15 @@ class Crawler:
                 excel_path = export_excel(self.db, self.app_config.base_dir, user_id, creator.name, self.logger)
                 database_exportable = len(self.db.current_notes(user_id))
                 status = determine_run_status(mode, collection, target_exportable)
+                validation_dir = write_live_validation_artifact(
+                    self.app_config.base_dir,
+                    run_id=run_id,
+                    status=status,
+                    login_status=LoginStatus.LOGIN_OK.value,
+                    notes_discovered=len(note_cards),
+                    collection=collection,
+                )
+                self.logger.info("VALIDATION_ARTIFACT exported path=%s", validation_dir)
                 if status == RunStatus.SUCCESS.value:
                     checkpoint.mark_complete()
                     checkpoint.completed_note_ids = sorted(set(checkpoint.completed_note_ids) | set(collection.exportable_ids))
@@ -218,6 +232,7 @@ class Crawler:
                     "database_total_exportable": database_exportable,
                     "excel": str(excel_path),
                     "offline_qa": offline,
+                    "validation_artifact": str(validation_dir),
                 }
         except SafeStopRequested as stop:
             checkpoint.mark_safe_stop(stop.reason)
@@ -322,6 +337,7 @@ class Crawler:
                 await self._raise_if_safe_stop(page, "note_after_open", note_id)
                 if open_result.reason == "DETAIL_NOT_READY" and not open_result.detail_ready:
                     result.non_exportable_ids.append(note_id)
+                    result.validation_notes.append(build_detail_not_ready_validation_note(note_id))
                     self.logger.info(
                         "NOTE attempt_result note_id=%s result=DETAIL_NOT_READY strategy=%s detail_kind=%s reason=%s navigation_success=true detail_ready=false",
                         note_id,
@@ -373,9 +389,11 @@ class Crawler:
                 self._write_raw("note", note_id, checkpoint.run_id, note)
                 if note.get("status") in {"OK", "PARSE_PARTIAL"}:
                     result.exportable_ids.append(note_id)
+                    result.validation_notes.append(build_validation_note(note_id, note, detail_ready=True, exportable=True))
                 else:
                     result.non_exportable_ids.append(note_id)
                     result.non_public_ids.append(note_id)
+                    result.validation_notes.append(build_validation_note(note_id, note, detail_ready=True, exportable=False))
                 completed.add(note_id)
                 checkpoint.completed_note_ids = sorted(completed)
                 checkpoint.save(self.app_config.base_dir / "data" / "checkpoints")

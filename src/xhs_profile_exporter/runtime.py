@@ -91,6 +91,7 @@ class CollectionResult:
     profile_return_counts: dict[str, int] = field(default_factory=dict)
     field_presence: dict[str, dict[str, int]] = field(default_factory=dict)
     field_source_counts: dict[str, dict[str, int]] = field(default_factory=dict)
+    validation_notes: list[dict[str, Any]] = field(default_factory=list)
 
     @property
     def attempted_count(self) -> int:

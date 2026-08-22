@@ -16,6 +16,8 @@ Out of scope and removed from active parsing, export, validation, and review art
 
 SQLite keeps legacy `shares_*` columns and the `top_comments` table for old database compatibility, but active save/export/QA paths do not write or read them. Historical sections below may mention retired fields from earlier validation rounds; they are not the current product contract.
 
+Production E2E review bundles for bounded 5-note and 10-note runs are written under `validation/e2e_review/<run_id>/`. They include scoped detail-root DOM summaries, sanitized detail HTML, screenshots, final-field `actual.json`, `excel_readback.json`, and run-level `summary.json`; they do not include share evidence, comment bodies, network responses, browser storage, or full initial state dumps.
+
 ## Golden Truth Hardening - 2026-08-21
 
 Baseline before this hardening pass:

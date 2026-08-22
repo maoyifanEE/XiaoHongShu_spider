@@ -993,6 +993,39 @@ def test_label_only_metrics_do_not_make_detail_ready(tmp_path: Path, monkeypatch
     assert detail_count == 1
 
 
+def test_debug_dom_summary_does_not_include_share_wrapper(tmp_path: Path):
+    async def run():
+        crawler = Crawler(app_config(tmp_path), DummyDb(), DummyLogger())
+        async with async_playwright() as p:
+            browser = await p.chromium.launch(headless=True)
+            page = await browser.new_page()
+            await page.set_content(
+                """
+                <main class="note-detail" style="display:block;width:800px;height:600px">
+                  <h1 id="detail-title">标题</h1>
+                  <div id="detail-desc">正文</div>
+                  <div class="engage-bar">
+                    <span class="like-wrapper">1</span>
+                    <span class="collect-wrapper">2</span>
+                    <span class="chat-wrapper">3</span>
+                    <span class="share-wrapper">4</span>
+                  </div>
+                </main>
+                """
+            )
+            summary = await crawler._debug_dom_summary(page)
+            await browser.close()
+            return summary
+
+    summary = asyncio.run(run())
+    selectors = summary["selectors_checked"]
+    assert ".engage-bar .share-wrapper" not in selectors
+    assert not any(node["selector"] == ".engage-bar .share-wrapper" for node in summary["matched_nodes"])
+    assert ".engage-bar .like-wrapper" in selectors
+    assert ".engage-bar .collect-wrapper" in selectors
+    assert ".engage-bar .chat-wrapper" in selectors
+
+
 def test_hydrated_detail_with_numeric_metrics_and_tags_is_ready(tmp_path: Path, monkeypatch):
     async def run():
         crawler = Crawler(app_config(tmp_path), DummyDb(), DummyLogger())

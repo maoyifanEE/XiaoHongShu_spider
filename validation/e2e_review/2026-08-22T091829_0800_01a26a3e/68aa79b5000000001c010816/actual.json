@@ -1,0 +1,63 @@
+{
+  "note_id": "68aa79b5000000001c010816",
+  "detail_ready": true,
+  "status": "OK",
+  "fields": {
+    "title": {
+      "value": "懒人邪修法｜花小钱养好气血！！太值了",
+      "source": "DOM_EXACT",
+      "status": "PRESENT"
+    },
+    "body": {
+      "value": "#三分钟热度大赛 #三伏天 #养发 #养生 #社康",
+      "source": "DOM_EXACT",
+      "status": "PRESENT"
+    },
+    "note_type": {
+      "value": "视频",
+      "source": "DOM_EXACT",
+      "status": "PRESENT"
+    },
+    "publish_time": {
+      "value": "2025-08-24",
+      "source": "DOM_EXACT",
+      "status": "PRESENT"
+    },
+    "like_count": {
+      "value": 27,
+      "source": "DOM_EXACT",
+      "raw": "27",
+      "exact": true,
+      "status": "PRESENT"
+    },
+    "collect_count": {
+      "value": 5,
+      "source": "DOM_EXACT",
+      "raw": "5",
+      "exact": true,
+      "status": "PRESENT"
+    },
+    "comment_count": {
+      "value": 3,
+      "source": "DOM_EXACT",
+      "raw": "3",
+      "exact": true,
+      "status": "PRESENT"
+    },
+    "tags": {
+      "value": [
+        "三伏天",
+        "三分钟热度大赛",
+        "养发",
+        "养生",
+        "社康"
+      ],
+      "source": "DOM_EXACT",
+      "status": "PRESENT"
+    }
+  },
+  "quality": {
+    "passed": true,
+    "issues": []
+  }
+}

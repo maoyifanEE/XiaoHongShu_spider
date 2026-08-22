@@ -1,0 +1,58 @@
+{
+  "note_id": "6874c628000000002203c442",
+  "detail_ready": true,
+  "status": "OK",
+  "fields": {
+    "title": {
+      "value": "正畸保持阶段，如何保护修复牙齿和牙龈",
+      "source": "DOM_EXACT",
+      "status": "PRESENT"
+    },
+    "body": {
+      "value": "开学季摘牙套想美美出门，但发现牙齿脱矿！试了含氟CP，真的解决我大麻烦了！目前刚刚拆牙套的姐妹，真的可以试试",
+      "source": "DOM_EXACT",
+      "status": "PRESENT"
+    },
+    "note_type": {
+      "value": "视频",
+      "source": "DOM_EXACT",
+      "status": "PRESENT"
+    },
+    "publish_time": {
+      "value": "2025-07-15",
+      "source": "DOM_EXACT",
+      "status": "PRESENT"
+    },
+    "like_count": {
+      "value": 18,
+      "source": "DOM_EXACT",
+      "raw": "18",
+      "exact": true,
+      "status": "PRESENT"
+    },
+    "collect_count": {
+      "value": 4,
+      "source": "DOM_EXACT",
+      "raw": "4",
+      "exact": true,
+      "status": "PRESENT"
+    },
+    "comment_count": {
+      "value": 0,
+      "source": "DOM_EXACT",
+      "raw": "0",
+      "exact": true,
+      "status": "PRESENT"
+    },
+    "tags": {
+      "value": null,
+      "source": "MISSING",
+      "missing_reason": "confirmed_absent",
+      "status": "CONFIRMED_ABSENT"
+    }
+  },
+  "quality": {
+    "passed": true,
+    "issues": []
+  }
+}

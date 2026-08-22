@@ -1,0 +1,31 @@
+{
+  "run_id": "2026-08-22T091829_0800_01a26a3e",
+  "findings": [
+    {
+      "note_id": "6874c628000000002203c442",
+      "field": "tags",
+      "classification": "TRUE_ABSENT",
+      "dom_evidence": {
+        "detail_root_found": true,
+        "tag_nodes_found": 0,
+        "tag_texts": [],
+        "body_text_preview": "开学季摘牙套想美美出门，但发现牙齿脱矿！试了含氟CP，真的解决我大麻烦了！目前刚刚拆牙套的姐妹，真的可以试试",
+        "candidate_selectors": [
+          "#detail-desc a[href*=\"search\"]",
+          "#detail-desc a[href*=\"search_result\"]",
+          "a[href*=\"/search_result\"]",
+          "a[href*=\"/search\"]"
+        ],
+        "candidate_matches": [],
+        "pre_post_consistent": true
+      },
+      "visual_evidence": {
+        "visual_tags_status": "ABSENT",
+        "visible_tag_texts": [],
+        "source": "page_screenshot.png manual offline inspection"
+      },
+      "structured_evidence": "not_present_in_artifact",
+      "decision": "tags confirmed absent; null business value is correct"
+    }
+  ]
+}

@@ -1,0 +1,114 @@
+{
+  "run_id": "2026-08-22T091829_0800_01a26a3e",
+  "data_quality_status": "PASS",
+  "attempted": 10,
+  "target_verified": 10,
+  "detail_ready": 10,
+  "exportable": 10,
+  "navigation_failed": 0,
+  "detail_not_ready": 0,
+  "risk_control": false,
+  "human_verification": false,
+  "safe_stop_reason": null,
+  "field_completeness": {
+    "title": {
+      "present": 10,
+      "missing": 0
+    },
+    "body": {
+      "present": 10,
+      "missing": 0
+    },
+    "note_type": {
+      "present": 10,
+      "missing": 0
+    },
+    "publish_time": {
+      "present": 10,
+      "missing": 0
+    },
+    "like_count": {
+      "present": 10,
+      "missing": 0
+    },
+    "collect_count": {
+      "present": 10,
+      "missing": 0
+    },
+    "comment_count": {
+      "present": 10,
+      "missing": 0
+    },
+    "tags": {
+      "present": 9,
+      "missing": 1
+    }
+  },
+  "field_quality": {
+    "title": {
+      "present": 10,
+      "confirmed_absent": 0,
+      "unverified_missing": 0,
+      "verified_total": 10
+    },
+    "body": {
+      "present": 10,
+      "confirmed_absent": 0,
+      "unverified_missing": 0,
+      "verified_total": 10
+    },
+    "note_type": {
+      "present": 10,
+      "confirmed_absent": 0,
+      "unverified_missing": 0,
+      "verified_total": 10
+    },
+    "publish_time": {
+      "present": 10,
+      "confirmed_absent": 0,
+      "unverified_missing": 0,
+      "verified_total": 10
+    },
+    "like_count": {
+      "present": 10,
+      "confirmed_absent": 0,
+      "unverified_missing": 0,
+      "verified_total": 10
+    },
+    "collect_count": {
+      "present": 10,
+      "confirmed_absent": 0,
+      "unverified_missing": 0,
+      "verified_total": 10
+    },
+    "comment_count": {
+      "present": 10,
+      "confirmed_absent": 0,
+      "unverified_missing": 0,
+      "verified_total": 10
+    },
+    "tags": {
+      "present": 9,
+      "confirmed_absent": 1,
+      "unverified_missing": 0,
+      "verified_total": 10
+    }
+  },
+  "unverified_missing_note_ids": {},
+  "confirmed_absent_note_ids": {
+    "tags": [
+      "6874c628000000002203c442"
+    ]
+  },
+  "missing_field_note_ids": {},
+  "pre_post_inconsistent_note_ids": [],
+  "quality_issue_note_ids": [],
+  "excel_readback": {
+    "excel_path": "C:\\Users\\maoyi\\Desktop\\script\\xiaohongshuSpider\\XHS_Profile_Exporter\\output\\辣香郭_小红书公开信息_20260822_092056.xlsx",
+    "rows_expected": 10,
+    "rows_found": 10,
+    "duplicate_note_ids": [],
+    "missing_note_ids": [],
+    "field_diffs": []
+  }
+}

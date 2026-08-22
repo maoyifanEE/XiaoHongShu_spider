@@ -58,6 +58,16 @@ def test_db_qa_and_export(tmp_path: Path):
     assert "shares" not in report["metrics"]
     assert "comments" not in report
     assert db.conn.execute("SELECT COUNT(*) FROM top_comments").fetchone()[0] == 0
+    metric_columns = {
+        row[1]
+        for row in db.conn.execute("PRAGMA table_info(note_metrics_snapshots)").fetchall()
+    }
+    assert {"shares_value", "shares_raw", "shares_is_exact"}.issubset(metric_columns)
+    metrics = db.conn.execute(
+        "SELECT shares_value, shares_raw, shares_is_exact FROM note_metrics_snapshots WHERE note_id = ?",
+        ("note1",),
+    ).fetchone()
+    assert tuple(metrics) == (None, None, None)
     current = db.current_notes(creator_id)[0]
     assert "shares_value" not in current.keys()
     path = export_excel(db, tmp_path, creator_id, "测试博主", DummyLogger())

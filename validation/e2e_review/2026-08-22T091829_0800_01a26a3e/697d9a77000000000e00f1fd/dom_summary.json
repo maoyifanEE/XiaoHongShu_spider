@@ -1,0 +1,316 @@
+{
+  "note_id": "697d9a77000000000e00f1fd",
+  "pre_extract_dom_summary": {
+    "note_id": "697d9a77000000000e00f1fd",
+    "detail_root": {
+      "root_found": true,
+      "root_reason": "DETAIL_EVIDENCE_ROOT",
+      "detail_selector": "[class*=\"note-detail\"], [class*=\"noteDetail\"], [class*=\"NoteDetail\"], [data-testid*=\"note-detail\"], [role=\"dialog\"]",
+      "evidence_selector": "#detail-title, #detail-desc, .engage-bar, [class*=engage], [class*=interaction], [class*=Interact]",
+      "detail_root_count": 3,
+      "evidence_count": 24
+    },
+    "fields": {
+      "title": {
+        "selectors_checked": [
+          "#detail-title",
+          "h1",
+          "[class*=title]",
+          "[data-testid*=title]"
+        ],
+        "matched_count": 1,
+        "text": "如果我光头你还会爱我吗？"
+      },
+      "body": {
+        "selectors_checked": [
+          "#detail-desc",
+          "[class*=desc]",
+          "[class*=content]",
+          ".note-content",
+          "[data-testid*=content]"
+        ],
+        "matched_count": 1,
+        "text": "#白天鹅生发仪#生发养发#养发#剃光头养发"
+      },
+      "publish_time": {
+        "selectors_checked": [
+          "detail root text"
+        ],
+        "matched_count": 1,
+        "text": "请刷新试试\n辣香郭\n关注\n如果我光头你还会爱我吗？\n#白天鹅生发仪#生发养发#养发#剃光头养发\n猜你想搜\n剪头发剃光头\n01-31\n共 17 条评论\nlind\n我也是天生发量少，我妈妈就少，这导致我整个学生时期自卑到现在\n02-03上海\n1\n2\n辣香郭\n作者\n我也是从奶奶开始就少，到现在就更少了\n02-03广东\n赞\n回复\n展开 1 条回复\n果蔬\n好久不见头发长那么好了，替你高兴丫头\n03-11广东\n赞\n1\n辣香郭\n作者\n谢谢宝，没想到这么久还有宝宝关注我\n03-11广东\n赞\n回复\nlilies\n我也想剃光头了，走哪掉哪，家里到处都是头发\n02-02广东\n1\n1\n辣香郭\n作者\n别说了，我之前也一样\n02-03广东\n赞\n回复\n和大将\n生发仪戴多久有用，我也看的这款\n02-02江西\n1\n1\n辣香郭\n作者\n用了半年\n02-03广东\n赞\n回复\n相识九月\n我头发也是太少了，尤其是头顶\n02-02江西\n1\n1\n辣香郭\n作者\n我也是发缝上面\n02-03广东\n赞\n回复\n确定是首席\n剃光头不能养发，要不就没有男人中年地中海的无奈了，别轻信谣言\n02-06河北\n赞\n回复\n▶|II|II||III|II 14"
+      },
+      "like_count": {
+        "selectors_checked": [
+          ".engage-bar .like-wrapper",
+          ".engage-bar [class*=like-wrapper]",
+          ".engage-bar [class*=likeWrapper]",
+          ".engage-bar [class*=Like]"
+        ],
+        "matched_count": 1,
+        "text": "58"
+      },
+      "collect_count": {
+        "selectors_checked": [
+          ".engage-bar .collect-wrapper",
+          ".engage-bar [class*=collect-wrapper]",
+          ".engage-bar [class*=collectWrapper]",
+          ".engage-bar [class*=Collect]"
+        ],
+        "matched_count": 1,
+        "text": "8"
+      },
+      "comment_count": {
+        "selectors_checked": [
+          ".engage-bar .chat-wrapper",
+          ".engage-bar [class*=chat-wrapper]",
+          ".engage-bar [class*=comment-wrapper]",
+          ".engage-bar [class*=Chat]",
+          ".engage-bar [class*=Comment]"
+        ],
+        "matched_count": 1,
+        "text": "17",
+        "zero_comment_evidence": {
+          "comment_area_found": true,
+          "comment_area_selector": "div.comments-el",
+          "comment_area_selectors_checked": [
+            "[class*=\"comments-container\"]",
+            "[class*=\"commentsContainer\"]",
+            "[class*=\"CommentsContainer\"]",
+            "[class*=\"comments-list\"]",
+            "[class*=\"commentsList\"]",
+            "[class*=\"CommentsList\"]",
+            "[class*=\"comment-list\"]",
+            "[class*=\"commentList\"]",
+            "[class*=\"CommentList\"]",
+            "[class*=\"comments-el\"]",
+            "[class*=\"commentsEl\"]",
+            "[class*=\"CommentsEl\"]",
+            "[data-testid*=\"comments\"]",
+            "[data-testid*=\"comment-list\"]"
+          ],
+          "comment_area_node": {
+            "tag": "div",
+            "id": "",
+            "class": "comments-el",
+            "data_testid": "",
+            "role": ""
+          },
+          "comment_area_ancestors": [
+            {
+              "tag": "div",
+              "id": "",
+              "class": "comments-el",
+              "data_testid": "",
+              "role": ""
+            },
+            {
+              "tag": "div",
+              "id": "",
+              "class": "note-scroller",
+              "data_testid": "",
+              "role": ""
+            },
+            {
+              "tag": "div",
+              "id": "",
+              "class": "interaction-container",
+              "data_testid": "",
+              "role": ""
+            },
+            {
+              "tag": "div",
+              "id": "noteContainer",
+              "class": "note-container",
+              "data_testid": "",
+              "role": ""
+            },
+            {
+              "tag": "div",
+              "id": "",
+              "class": "note-detail-mask",
+              "data_testid": "",
+              "role": ""
+            }
+          ],
+          "selectors_checked": [
+            "[class*=empty]",
+            "[class*=Empty]",
+            "[class*=placeholder]",
+            "[class*=Placeholder]",
+            "[data-testid*=empty]",
+            "[data-testid*=placeholder]"
+          ],
+          "matched_count": 0,
+          "text": ""
+        }
+      },
+      "tags": {
+        "selectors_checked": [
+          "#detail-desc a[href*=\"search\"]",
+          "#detail-desc a[href*=\"search_result\"]",
+          "a[href*=\"/search_result\"]",
+          "a[href*=\"/search\"]"
+        ],
+        "matched_count": 4,
+        "text": "#白天鹅生发仪\n#生发养发\n#养发\n#剃光头养发"
+      }
+    }
+  },
+  "post_extract_dom_summary": {
+    "note_id": "697d9a77000000000e00f1fd",
+    "detail_root": {
+      "root_found": true,
+      "root_reason": "DETAIL_EVIDENCE_ROOT",
+      "detail_selector": "[class*=\"note-detail\"], [class*=\"noteDetail\"], [class*=\"NoteDetail\"], [data-testid*=\"note-detail\"], [role=\"dialog\"]",
+      "evidence_selector": "#detail-title, #detail-desc, .engage-bar, [class*=engage], [class*=interaction], [class*=Interact]",
+      "detail_root_count": 3,
+      "evidence_count": 24
+    },
+    "fields": {
+      "title": {
+        "selectors_checked": [
+          "#detail-title",
+          "h1",
+          "[class*=title]",
+          "[data-testid*=title]"
+        ],
+        "matched_count": 1,
+        "text": "如果我光头你还会爱我吗？"
+      },
+      "body": {
+        "selectors_checked": [
+          "#detail-desc",
+          "[class*=desc]",
+          "[class*=content]",
+          ".note-content",
+          "[data-testid*=content]"
+        ],
+        "matched_count": 1,
+        "text": "#白天鹅生发仪#生发养发#养发#剃光头养发"
+      },
+      "publish_time": {
+        "selectors_checked": [
+          "detail root text"
+        ],
+        "matched_count": 1,
+        "text": "请刷新试试\n辣香郭\n关注\n如果我光头你还会爱我吗？\n#白天鹅生发仪#生发养发#养发#剃光头养发\n猜你想搜\n剪头发剃光头\n01-31\n共 17 条评论\nlind\n我也是天生发量少，我妈妈就少，这导致我整个学生时期自卑到现在\n02-03上海\n1\n2\n辣香郭\n作者\n我也是从奶奶开始就少，到现在就更少了\n02-03广东\n赞\n回复\n展开 1 条回复\n果蔬\n好久不见头发长那么好了，替你高兴丫头\n03-11广东\n赞\n1\n辣香郭\n作者\n谢谢宝，没想到这么久还有宝宝关注我\n03-11广东\n赞\n回复\nlilies\n我也想剃光头了，走哪掉哪，家里到处都是头发\n02-02广东\n1\n1\n辣香郭\n作者\n别说了，我之前也一样\n02-03广东\n赞\n回复\n和大将\n生发仪戴多久有用，我也看的这款\n02-02江西\n1\n1\n辣香郭\n作者\n用了半年\n02-03广东\n赞\n回复\n相识九月\n我头发也是太少了，尤其是头顶\n02-02江西\n1\n1\n辣香郭\n作者\n我也是发缝上面\n02-03广东\n赞\n回复\n确定是首席\n剃光头不能养发，要不就没有男人中年地中海的无奈了，别轻信谣言\n02-06河北\n赞\n回复\n▶|II|II||III|II 14"
+      },
+      "like_count": {
+        "selectors_checked": [
+          ".engage-bar .like-wrapper",
+          ".engage-bar [class*=like-wrapper]",
+          ".engage-bar [class*=likeWrapper]",
+          ".engage-bar [class*=Like]"
+        ],
+        "matched_count": 1,
+        "text": "58"
+      },
+      "collect_count": {
+        "selectors_checked": [
+          ".engage-bar .collect-wrapper",
+          ".engage-bar [class*=collect-wrapper]",
+          ".engage-bar [class*=collectWrapper]",
+          ".engage-bar [class*=Collect]"
+        ],
+        "matched_count": 1,
+        "text": "8"
+      },
+      "comment_count": {
+        "selectors_checked": [
+          ".engage-bar .chat-wrapper",
+          ".engage-bar [class*=chat-wrapper]",
+          ".engage-bar [class*=comment-wrapper]",
+          ".engage-bar [class*=Chat]",
+          ".engage-bar [class*=Comment]"
+        ],
+        "matched_count": 1,
+        "text": "17",
+        "zero_comment_evidence": {
+          "comment_area_found": true,
+          "comment_area_selector": "div.comments-el",
+          "comment_area_selectors_checked": [
+            "[class*=\"comments-container\"]",
+            "[class*=\"commentsContainer\"]",
+            "[class*=\"CommentsContainer\"]",
+            "[class*=\"comments-list\"]",
+            "[class*=\"commentsList\"]",
+            "[class*=\"CommentsList\"]",
+            "[class*=\"comment-list\"]",
+            "[class*=\"commentList\"]",
+            "[class*=\"CommentList\"]",
+            "[class*=\"comments-el\"]",
+            "[class*=\"commentsEl\"]",
+            "[class*=\"CommentsEl\"]",
+            "[data-testid*=\"comments\"]",
+            "[data-testid*=\"comment-list\"]"
+          ],
+          "comment_area_node": {
+            "tag": "div",
+            "id": "",
+            "class": "comments-el",
+            "data_testid": "",
+            "role": ""
+          },
+          "comment_area_ancestors": [
+            {
+              "tag": "div",
+              "id": "",
+              "class": "comments-el",
+              "data_testid": "",
+              "role": ""
+            },
+            {
+              "tag": "div",
+              "id": "",
+              "class": "note-scroller",
+              "data_testid": "",
+              "role": ""
+            },
+            {
+              "tag": "div",
+              "id": "",
+              "class": "interaction-container",
+              "data_testid": "",
+              "role": ""
+            },
+            {
+              "tag": "div",
+              "id": "noteContainer",
+              "class": "note-container",
+              "data_testid": "",
+              "role": ""
+            },
+            {
+              "tag": "div",
+              "id": "",
+              "class": "note-detail-mask",
+              "data_testid": "",
+              "role": ""
+            }
+          ],
+          "selectors_checked": [
+            "[class*=empty]",
+            "[class*=Empty]",
+            "[class*=placeholder]",
+            "[class*=Placeholder]",
+            "[data-testid*=empty]",
+            "[data-testid*=placeholder]"
+          ],
+          "matched_count": 0,
+          "text": ""
+        }
+      },
+      "tags": {
+        "selectors_checked": [
+          "#detail-desc a[href*=\"search\"]",
+          "#detail-desc a[href*=\"search_result\"]",
+          "a[href*=\"/search_result\"]",
+          "a[href*=\"/search\"]"
+        ],
+        "matched_count": 4,
+        "text": "#白天鹅生发仪\n#生发养发\n#养发\n#剃光头养发"
+      }
+    }
+  },
+  "pre_post_consistent": true
+}

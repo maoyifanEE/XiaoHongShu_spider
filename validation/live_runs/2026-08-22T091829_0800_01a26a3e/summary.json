@@ -1,0 +1,63 @@
+{
+  "run_id": "2026-08-22T091829_0800_01a26a3e",
+  "status": "SUCCESS",
+  "login_status": "LOGIN_OK",
+  "notes_discovered": 10,
+  "attempted": 10,
+  "target_verified": 10,
+  "exportable": 10,
+  "navigation_failed": 0,
+  "detail_not_ready": 0,
+  "safe_stop_reason": null,
+  "fields": {
+    "title": {
+      "value_present": 10,
+      "source": {
+        "DOM_EXACT": 10
+      }
+    },
+    "body": {
+      "value_present": 10,
+      "source": {
+        "DOM_EXACT": 10
+      }
+    },
+    "note_type": {
+      "value_present": 10,
+      "source": {
+        "DOM_EXACT": 10
+      }
+    },
+    "publish_time": {
+      "value_present": 10,
+      "source": {
+        "DOM_EXACT": 10
+      }
+    },
+    "like_count": {
+      "value_present": 10,
+      "source": {
+        "DOM_EXACT": 10
+      }
+    },
+    "collect_count": {
+      "value_present": 10,
+      "source": {
+        "DOM_EXACT": 10
+      }
+    },
+    "comment_count": {
+      "value_present": 10,
+      "source": {
+        "DOM_EXACT": 10
+      }
+    },
+    "tags": {
+      "value_present": 9,
+      "source": {
+        "DOM_EXACT": 9,
+        "MISSING": 1
+      }
+    }
+  }
+}

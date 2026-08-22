@@ -1,0 +1,316 @@
+{
+  "note_id": "68d15cb0000000000e02537e",
+  "pre_extract_dom_summary": {
+    "note_id": "68d15cb0000000000e02537e",
+    "detail_root": {
+      "root_found": true,
+      "root_reason": "DETAIL_EVIDENCE_ROOT",
+      "detail_selector": "[class*=\"note-detail\"], [class*=\"noteDetail\"], [class*=\"NoteDetail\"], [data-testid*=\"note-detail\"], [role=\"dialog\"]",
+      "evidence_selector": "#detail-title, #detail-desc, .engage-bar, [class*=engage], [class*=interaction], [class*=Interact]",
+      "detail_root_count": 3,
+      "evidence_count": 27
+    },
+    "fields": {
+      "title": {
+        "selectors_checked": [
+          "#detail-title",
+          "h1",
+          "[class*=title]",
+          "[data-testid*=title]"
+        ],
+        "matched_count": 1,
+        "text": "00后三甲护士裸辞了！！"
+      },
+      "body": {
+        "selectors_checked": [
+          "#detail-desc",
+          "[class*=desc]",
+          "[class*=content]",
+          ".note-content",
+          "[data-testid*=content]"
+        ],
+        "matched_count": 1,
+        "text": "#我是奇思妙想的小羊 我真的在毕业当年，就离开临床了，重启了人生...给自己一年时间#小红书夜人节 #辞职 #重启人生 #护士 #裸辞 #应届生"
+      },
+      "publish_time": {
+        "selectors_checked": [
+          "detail root text"
+        ],
+        "matched_count": 1,
+        "text": "请刷新试试\n辣香郭\n关注\n00后三甲护士裸辞了！！\n#我是奇思妙想的小羊 我真的在毕业当年，就离开临床了，重启了人生...给自己一年时间#小红书夜人节 #辞职 #重启人生 #护士 #裸辞 #应届生\n猜你想搜\n护士辞职了可以干什么\n2025-09-22\n共 29 条评论\n新想事成\n有打算下一步找什么样的工作吗，同想辞职！\n2025-09-23云南\n2\n2\n辣香郭\n作者\n新方向\n2025-09-24广东\n赞\n回复\n展开 1 条回复\n榴莲生椰拿铁\n加油加油永远为这份勇敢悸动 接下一个不干这行的是我\n2025-09-23广东\n3\n1\n辣香郭\n作者\n加油小敏\n2025-09-24广东\n赞\n回复\nOM~\n放心吧，你不是逃跑，而是重新开始\n2025-09-23湖南\n2\n1\n辣香郭\n作者\n2025-09-24广东\n赞\n回复\n半糖不加冰\n旭啊你好勇敢\n2025-09-22四川\n2\n1\n辣香郭\n作者\n期待\n2025-09-24广东\n赞\n回复\n好运猫咪钱多多\n加油\n2025-09-23广东\n1\n1\n辣香郭\n作者\n2025-09-24广东\n赞\n回复\nsjdj西南部\n你准备转行去干什么\n2025-09-22浙江"
+      },
+      "like_count": {
+        "selectors_checked": [
+          ".engage-bar .like-wrapper",
+          ".engage-bar [class*=like-wrapper]",
+          ".engage-bar [class*=likeWrapper]",
+          ".engage-bar [class*=Like]"
+        ],
+        "matched_count": 1,
+        "text": "303"
+      },
+      "collect_count": {
+        "selectors_checked": [
+          ".engage-bar .collect-wrapper",
+          ".engage-bar [class*=collect-wrapper]",
+          ".engage-bar [class*=collectWrapper]",
+          ".engage-bar [class*=Collect]"
+        ],
+        "matched_count": 1,
+        "text": "18"
+      },
+      "comment_count": {
+        "selectors_checked": [
+          ".engage-bar .chat-wrapper",
+          ".engage-bar [class*=chat-wrapper]",
+          ".engage-bar [class*=comment-wrapper]",
+          ".engage-bar [class*=Chat]",
+          ".engage-bar [class*=Comment]"
+        ],
+        "matched_count": 1,
+        "text": "29",
+        "zero_comment_evidence": {
+          "comment_area_found": true,
+          "comment_area_selector": "div.comments-el",
+          "comment_area_selectors_checked": [
+            "[class*=\"comments-container\"]",
+            "[class*=\"commentsContainer\"]",
+            "[class*=\"CommentsContainer\"]",
+            "[class*=\"comments-list\"]",
+            "[class*=\"commentsList\"]",
+            "[class*=\"CommentsList\"]",
+            "[class*=\"comment-list\"]",
+            "[class*=\"commentList\"]",
+            "[class*=\"CommentList\"]",
+            "[class*=\"comments-el\"]",
+            "[class*=\"commentsEl\"]",
+            "[class*=\"CommentsEl\"]",
+            "[data-testid*=\"comments\"]",
+            "[data-testid*=\"comment-list\"]"
+          ],
+          "comment_area_node": {
+            "tag": "div",
+            "id": "",
+            "class": "comments-el",
+            "data_testid": "",
+            "role": ""
+          },
+          "comment_area_ancestors": [
+            {
+              "tag": "div",
+              "id": "",
+              "class": "comments-el",
+              "data_testid": "",
+              "role": ""
+            },
+            {
+              "tag": "div",
+              "id": "",
+              "class": "note-scroller",
+              "data_testid": "",
+              "role": ""
+            },
+            {
+              "tag": "div",
+              "id": "",
+              "class": "interaction-container",
+              "data_testid": "",
+              "role": ""
+            },
+            {
+              "tag": "div",
+              "id": "noteContainer",
+              "class": "note-container",
+              "data_testid": "",
+              "role": ""
+            },
+            {
+              "tag": "div",
+              "id": "",
+              "class": "note-detail-mask",
+              "data_testid": "",
+              "role": ""
+            }
+          ],
+          "selectors_checked": [
+            "[class*=empty]",
+            "[class*=Empty]",
+            "[class*=placeholder]",
+            "[class*=Placeholder]",
+            "[data-testid*=empty]",
+            "[data-testid*=placeholder]"
+          ],
+          "matched_count": 0,
+          "text": ""
+        }
+      },
+      "tags": {
+        "selectors_checked": [
+          "#detail-desc a[href*=\"search\"]",
+          "#detail-desc a[href*=\"search_result\"]",
+          "a[href*=\"/search_result\"]",
+          "a[href*=\"/search\"]"
+        ],
+        "matched_count": 7,
+        "text": "#我是奇思妙想的小羊\n#小红书夜人节\n#辞职\n#重启人生\n#护士\n#裸辞\n#应届生"
+      }
+    }
+  },
+  "post_extract_dom_summary": {
+    "note_id": "68d15cb0000000000e02537e",
+    "detail_root": {
+      "root_found": true,
+      "root_reason": "DETAIL_EVIDENCE_ROOT",
+      "detail_selector": "[class*=\"note-detail\"], [class*=\"noteDetail\"], [class*=\"NoteDetail\"], [data-testid*=\"note-detail\"], [role=\"dialog\"]",
+      "evidence_selector": "#detail-title, #detail-desc, .engage-bar, [class*=engage], [class*=interaction], [class*=Interact]",
+      "detail_root_count": 3,
+      "evidence_count": 27
+    },
+    "fields": {
+      "title": {
+        "selectors_checked": [
+          "#detail-title",
+          "h1",
+          "[class*=title]",
+          "[data-testid*=title]"
+        ],
+        "matched_count": 1,
+        "text": "00后三甲护士裸辞了！！"
+      },
+      "body": {
+        "selectors_checked": [
+          "#detail-desc",
+          "[class*=desc]",
+          "[class*=content]",
+          ".note-content",
+          "[data-testid*=content]"
+        ],
+        "matched_count": 1,
+        "text": "#我是奇思妙想的小羊 我真的在毕业当年，就离开临床了，重启了人生...给自己一年时间#小红书夜人节 #辞职 #重启人生 #护士 #裸辞 #应届生"
+      },
+      "publish_time": {
+        "selectors_checked": [
+          "detail root text"
+        ],
+        "matched_count": 1,
+        "text": "请刷新试试\n辣香郭\n关注\n00后三甲护士裸辞了！！\n#我是奇思妙想的小羊 我真的在毕业当年，就离开临床了，重启了人生...给自己一年时间#小红书夜人节 #辞职 #重启人生 #护士 #裸辞 #应届生\n猜你想搜\n护士辞职了可以干什么\n2025-09-22\n共 29 条评论\n新想事成\n有打算下一步找什么样的工作吗，同想辞职！\n2025-09-23云南\n2\n2\n辣香郭\n作者\n新方向\n2025-09-24广东\n赞\n回复\n展开 1 条回复\n榴莲生椰拿铁\n加油加油永远为这份勇敢悸动 接下一个不干这行的是我\n2025-09-23广东\n3\n1\n辣香郭\n作者\n加油小敏\n2025-09-24广东\n赞\n回复\nOM~\n放心吧，你不是逃跑，而是重新开始\n2025-09-23湖南\n2\n1\n辣香郭\n作者\n2025-09-24广东\n赞\n回复\n半糖不加冰\n旭啊你好勇敢\n2025-09-22四川\n2\n1\n辣香郭\n作者\n期待\n2025-09-24广东\n赞\n回复\n好运猫咪钱多多\n加油\n2025-09-23广东\n1\n1\n辣香郭\n作者\n2025-09-24广东\n赞\n回复\nsjdj西南部\n你准备转行去干什么\n2025-09-22浙江"
+      },
+      "like_count": {
+        "selectors_checked": [
+          ".engage-bar .like-wrapper",
+          ".engage-bar [class*=like-wrapper]",
+          ".engage-bar [class*=likeWrapper]",
+          ".engage-bar [class*=Like]"
+        ],
+        "matched_count": 1,
+        "text": "303"
+      },
+      "collect_count": {
+        "selectors_checked": [
+          ".engage-bar .collect-wrapper",
+          ".engage-bar [class*=collect-wrapper]",
+          ".engage-bar [class*=collectWrapper]",
+          ".engage-bar [class*=Collect]"
+        ],
+        "matched_count": 1,
+        "text": "18"
+      },
+      "comment_count": {
+        "selectors_checked": [
+          ".engage-bar .chat-wrapper",
+          ".engage-bar [class*=chat-wrapper]",
+          ".engage-bar [class*=comment-wrapper]",
+          ".engage-bar [class*=Chat]",
+          ".engage-bar [class*=Comment]"
+        ],
+        "matched_count": 1,
+        "text": "29",
+        "zero_comment_evidence": {
+          "comment_area_found": true,
+          "comment_area_selector": "div.comments-el",
+          "comment_area_selectors_checked": [
+            "[class*=\"comments-container\"]",
+            "[class*=\"commentsContainer\"]",
+            "[class*=\"CommentsContainer\"]",
+            "[class*=\"comments-list\"]",
+            "[class*=\"commentsList\"]",
+            "[class*=\"CommentsList\"]",
+            "[class*=\"comment-list\"]",
+            "[class*=\"commentList\"]",
+            "[class*=\"CommentList\"]",
+            "[class*=\"comments-el\"]",
+            "[class*=\"commentsEl\"]",
+            "[class*=\"CommentsEl\"]",
+            "[data-testid*=\"comments\"]",
+            "[data-testid*=\"comment-list\"]"
+          ],
+          "comment_area_node": {
+            "tag": "div",
+            "id": "",
+            "class": "comments-el",
+            "data_testid": "",
+            "role": ""
+          },
+          "comment_area_ancestors": [
+            {
+              "tag": "div",
+              "id": "",
+              "class": "comments-el",
+              "data_testid": "",
+              "role": ""
+            },
+            {
+              "tag": "div",
+              "id": "",
+              "class": "note-scroller",
+              "data_testid": "",
+              "role": ""
+            },
+            {
+              "tag": "div",
+              "id": "",
+              "class": "interaction-container",
+              "data_testid": "",
+              "role": ""
+            },
+            {
+              "tag": "div",
+              "id": "noteContainer",
+              "class": "note-container",
+              "data_testid": "",
+              "role": ""
+            },
+            {
+              "tag": "div",
+              "id": "",
+              "class": "note-detail-mask",
+              "data_testid": "",
+              "role": ""
+            }
+          ],
+          "selectors_checked": [
+            "[class*=empty]",
+            "[class*=Empty]",
+            "[class*=placeholder]",
+            "[class*=Placeholder]",
+            "[data-testid*=empty]",
+            "[data-testid*=placeholder]"
+          ],
+          "matched_count": 0,
+          "text": ""
+        }
+      },
+      "tags": {
+        "selectors_checked": [
+          "#detail-desc a[href*=\"search\"]",
+          "#detail-desc a[href*=\"search_result\"]",
+          "a[href*=\"/search_result\"]",
+          "a[href*=\"/search\"]"
+        ],
+        "matched_count": 7,
+        "text": "#我是奇思妙想的小羊\n#小红书夜人节\n#辞职\n#重启人生\n#护士\n#裸辞\n#应届生"
+      }
+    }
+  },
+  "pre_post_consistent": true
+}

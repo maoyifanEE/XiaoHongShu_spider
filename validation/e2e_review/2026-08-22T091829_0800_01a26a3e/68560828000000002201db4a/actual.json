@@ -1,0 +1,61 @@
+{
+  "note_id": "68560828000000002201db4a",
+  "detail_ready": true,
+  "status": "OK",
+  "fields": {
+    "title": {
+      "value": "高能量00后，养生需要多少步🥹",
+      "source": "DOM_EXACT",
+      "status": "PRESENT"
+    },
+    "body": {
+      "value": "这么卷的大环境，好身体才是第一#一起来养生 #年轻人的养生血脉开始觉醒#艾诗摩尔生发梳",
+      "source": "DOM_EXACT",
+      "status": "PRESENT"
+    },
+    "note_type": {
+      "value": "视频",
+      "source": "DOM_EXACT",
+      "status": "PRESENT"
+    },
+    "publish_time": {
+      "value": "2025-06-25",
+      "source": "DOM_EXACT",
+      "status": "PRESENT"
+    },
+    "like_count": {
+      "value": 21,
+      "source": "DOM_EXACT",
+      "raw": "21",
+      "exact": true,
+      "status": "PRESENT"
+    },
+    "collect_count": {
+      "value": 1,
+      "source": "DOM_EXACT",
+      "raw": "1",
+      "exact": true,
+      "status": "PRESENT"
+    },
+    "comment_count": {
+      "value": 3,
+      "source": "DOM_EXACT",
+      "raw": "3",
+      "exact": true,
+      "status": "PRESENT"
+    },
+    "tags": {
+      "value": [
+        "一起来养生",
+        "年轻人的养生血脉开始觉醒",
+        "艾诗摩尔生发梳"
+      ],
+      "source": "DOM_EXACT",
+      "status": "PRESENT"
+    }
+  },
+  "quality": {
+    "passed": true,
+    "issues": []
+  }
+}

@@ -1,0 +1,8 @@
+{
+  "excel_path": "C:\\Users\\maoyi\\Desktop\\script\\xiaohongshuSpider\\XHS_Profile_Exporter\\output\\辣香郭_小红书公开信息_20260822_092056.xlsx",
+  "rows_expected": 10,
+  "rows_found": 10,
+  "duplicate_note_ids": [],
+  "missing_note_ids": [],
+  "field_diffs": []
+}

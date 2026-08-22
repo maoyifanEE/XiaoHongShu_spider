@@ -1,0 +1,62 @@
+{
+  "note_id": "68adcdf7000000001b03402c",
+  "detail_ready": true,
+  "status": "OK",
+  "fields": {
+    "title": {
+      "value": "14个月成功拯救发际线！！一路生发版🥹",
+      "source": "DOM_EXACT",
+      "status": "PRESENT"
+    },
+    "body": {
+      "value": "#我长头发了 #发际线有旋 #养发护发 #养生",
+      "source": "DOM_EXACT",
+      "status": "PRESENT"
+    },
+    "note_type": {
+      "value": "视频",
+      "source": "DOM_EXACT",
+      "status": "PRESENT"
+    },
+    "publish_time": {
+      "value": "2025-09-04",
+      "source": "DOM_EXACT",
+      "status": "PRESENT"
+    },
+    "like_count": {
+      "value": 108,
+      "source": "DOM_EXACT",
+      "raw": "108",
+      "exact": true,
+      "status": "PRESENT"
+    },
+    "collect_count": {
+      "value": 26,
+      "source": "DOM_EXACT",
+      "raw": "26",
+      "exact": true,
+      "status": "PRESENT"
+    },
+    "comment_count": {
+      "value": 1,
+      "source": "DOM_EXACT",
+      "raw": "1",
+      "exact": true,
+      "status": "PRESENT"
+    },
+    "tags": {
+      "value": [
+        "养发护发",
+        "养生",
+        "发际线有旋",
+        "我长头发了"
+      ],
+      "source": "DOM_EXACT",
+      "status": "PRESENT"
+    }
+  },
+  "quality": {
+    "passed": true,
+    "issues": []
+  }
+}

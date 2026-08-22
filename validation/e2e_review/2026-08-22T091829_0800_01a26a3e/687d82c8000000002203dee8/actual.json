@@ -1,0 +1,63 @@
+{
+  "note_id": "687d82c8000000002203dee8",
+  "detail_ready": true,
+  "status": "OK",
+  "fields": {
+    "title": {
+      "value": "Day1🥹沉迷邪修去湿法，已不知天地为何物",
+      "source": "DOM_EXACT",
+      "status": "PRESENT"
+    },
+    "body": {
+      "value": "真怕自己瘦太快！喝了姜茶第二天早上起来都很清醒#保持身心健康 #三伏天 #去湿气减肥 #变美的尽头是养生 #养发",
+      "source": "DOM_EXACT",
+      "status": "PRESENT"
+    },
+    "note_type": {
+      "value": "视频",
+      "source": "DOM_EXACT",
+      "status": "PRESENT"
+    },
+    "publish_time": {
+      "value": "2025-07-21",
+      "source": "DOM_EXACT",
+      "status": "PRESENT"
+    },
+    "like_count": {
+      "value": 25,
+      "source": "DOM_EXACT",
+      "raw": "25",
+      "exact": true,
+      "status": "PRESENT"
+    },
+    "collect_count": {
+      "value": 5,
+      "source": "DOM_EXACT",
+      "raw": "5",
+      "exact": true,
+      "status": "PRESENT"
+    },
+    "comment_count": {
+      "value": 5,
+      "source": "DOM_EXACT",
+      "raw": "5",
+      "exact": true,
+      "status": "PRESENT"
+    },
+    "tags": {
+      "value": [
+        "三伏天",
+        "保持身心健康",
+        "养发",
+        "去湿气减肥",
+        "变美的尽头是养生"
+      ],
+      "source": "DOM_EXACT",
+      "status": "PRESENT"
+    }
+  },
+  "quality": {
+    "passed": true,
+    "issues": []
+  }
+}

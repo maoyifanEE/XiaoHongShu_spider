@@ -413,6 +413,7 @@ async def capture_detail_review_state(page: Any, note_id: str) -> dict[str, Any]
           const clone = root ? root.cloneNode(true) : null;
           if (clone) {
             clone.querySelectorAll('[class*=comment-item], [class*=commentItem], [data-testid*=comment], [class*=comments], [class*=Comments]').forEach((el) => el.remove());
+            clone.querySelectorAll('[class*=share-wrapper], [class*=shareWrapper], [class*=Share]').forEach((el) => el.remove());
             clone.querySelectorAll("[href], [src]").forEach((el) => {
               for (const attr of ["href", "src"]) {
                 const value = el.getAttribute(attr);

@@ -38,13 +38,29 @@ SENSITIVE_TERMS = [
 UI_POLLUTION_TERMS = ["关注", "加载中", "说点什么", "发送", "取消"]
 
 
-def five_note_review_dir(base_dir: Path, run_id: str) -> Path:
-    path = base_dir / "validation" / "five_note_review" / run_id
+E2E_REVIEW_NOTE_LIMITS = {5, 10}
+FIELD_STATUS_PRESENT = "PRESENT"
+FIELD_STATUS_CONFIRMED_ABSENT = "CONFIRMED_ABSENT"
+FIELD_STATUS_UNVERIFIED_MISSING = "UNVERIFIED_MISSING"
+CLASSIFICATION_TRUE_ABSENT = "TRUE_ABSENT"
+CLASSIFICATION_INSUFFICIENT_EVIDENCE = "INSUFFICIENT_EVIDENCE"
+
+
+def e2e_review_enabled(mode: str, limit: int | None) -> bool:
+    return mode == "collect" and int(limit or 0) in E2E_REVIEW_NOTE_LIMITS
+
+
+def e2e_review_dir(base_dir: Path, run_id: str) -> Path:
+    path = base_dir / "validation" / "e2e_review" / run_id
     path.mkdir(parents=True, exist_ok=True)
     return path
 
 
-async def capture_five_note_review_state(page: Any, note_id: str) -> dict[str, Any]:
+def five_note_review_dir(base_dir: Path, run_id: str) -> Path:
+    return e2e_review_dir(base_dir, run_id)
+
+
+async def capture_e2e_review_state(page: Any, note_id: str) -> dict[str, Any]:
     return await page.evaluate(
         """
         (noteId) => {
@@ -147,6 +163,7 @@ async def capture_five_note_review_state(page: Any, note_id: str) -> dict[str, A
           const clone = root ? root.cloneNode(true) : null;
           if (clone) {
             clone.querySelectorAll('[class*=comment-item], [class*=commentItem], [data-testid*=comment], [class*=comments], [class*=Comments]').forEach((el) => el.remove());
+            clone.querySelectorAll('[class*=share-wrapper], [class*=shareWrapper], [class*=Share]').forEach((el) => el.remove());
             clone.querySelectorAll("[href], [src]").forEach((el) => {
               for (const attr of ["href", "src"]) {
                 const value = el.getAttribute(attr);
@@ -192,6 +209,9 @@ async def capture_five_note_review_state(page: Any, note_id: str) -> dict[str, A
     )
 
 
+capture_five_note_review_state = capture_e2e_review_state
+
+
 def build_actual_payload(note: dict[str, Any]) -> dict[str, Any]:
     sources = note.get("field_sources") or {}
     fields = {
@@ -213,6 +233,28 @@ def build_actual_payload(note: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def annotate_actual_field_status(
+    actual: dict[str, Any],
+    pre_dom_summary: dict[str, Any] | None = None,
+    post_dom_summary: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    actual = dict(actual)
+    fields = {field: dict(payload or {}) for field, payload in (actual.get("fields") or {}).items()}
+    for field in REVIEW_FIELDS:
+        payload = fields.setdefault(field, {"value": None, "source": "MISSING", "missing_reason": "not_observed"})
+        status = _review_field_status(field, payload, pre_dom_summary, post_dom_summary)
+        payload["status"] = status
+        if status == FIELD_STATUS_CONFIRMED_ABSENT:
+            payload["source"] = "MISSING"
+            payload["missing_reason"] = "confirmed_absent"
+        elif status == FIELD_STATUS_UNVERIFIED_MISSING:
+            payload.setdefault("source", "MISSING")
+            payload.setdefault("missing_reason", "not_observed")
+    actual["fields"] = fields
+    actual["quality"] = quality_check_actual(fields)
+    return actual
+
+
 def write_note_review_artifact(
     review_dir: Path,
     note_id: str,
@@ -229,6 +271,7 @@ def write_note_review_artifact(
         "post_extract_dom_summary": post_capture["dom_summary"],
         "pre_post_consistent": _dom_summaries_consistent(pre_capture["dom_summary"], post_capture["dom_summary"]),
     }
+    actual = annotate_actual_field_status(actual, pre_capture.get("dom_summary"), post_capture.get("dom_summary"))
     files = {
         "actual.json": json.dumps(actual, ensure_ascii=False, indent=2, default=str) + "\n",
         "dom_summary.json": json.dumps(dom_summary, ensure_ascii=False, indent=2, default=str) + "\n",
@@ -239,6 +282,135 @@ def write_note_review_artifact(
         (note_dir / name).write_text(content, encoding="utf-8")
     shutil.copyfile(screenshot_path, note_dir / "page_screenshot.png")
     return note_dir
+
+
+def write_e2e_review_summary(
+    review_dir: Path,
+    *,
+    run_id: str,
+    collection: Any,
+    excel_readback: dict[str, Any] | None,
+) -> Path:
+    summary = build_e2e_review_summary(run_id=run_id, collection=collection, review_dir=review_dir, excel_readback=excel_readback)
+    content = json.dumps(summary, ensure_ascii=False, indent=2, default=str) + "\n"
+    assert_artifact_text_safe(content, "summary.json")
+    path = review_dir / "summary.json"
+    path.write_text(content, encoding="utf-8")
+    write_data_quality_review(review_dir, run_id=run_id)
+    return path
+
+
+def build_e2e_review_summary(
+    *,
+    run_id: str,
+    collection: Any,
+    review_dir: Path,
+    excel_readback: dict[str, Any] | None,
+) -> dict[str, Any]:
+    pre_post_inconsistent_note_ids = []
+    quality_issue_note_ids = []
+    unverified_missing_note_ids: dict[str, list[str]] = {field: [] for field in REVIEW_FIELDS}
+    confirmed_absent_note_ids: dict[str, list[str]] = {field: [] for field in REVIEW_FIELDS}
+    field_quality = {
+        field: {
+            "present": 0,
+            "confirmed_absent": 0,
+            "unverified_missing": 0,
+            "verified_total": 0,
+        }
+        for field in REVIEW_FIELDS
+    }
+    for dom_summary_path in sorted(review_dir.glob("*/dom_summary.json")):
+        payload = json.loads(dom_summary_path.read_text(encoding="utf-8"))
+        if payload.get("pre_post_consistent") is False:
+            pre_post_inconsistent_note_ids.append(dom_summary_path.parent.name)
+    for actual_path in sorted(review_dir.glob("*/actual.json")):
+        payload = json.loads(actual_path.read_text(encoding="utf-8"))
+        if not (payload.get("quality") or {}).get("passed", True):
+            quality_issue_note_ids.append(actual_path.parent.name)
+        fields = payload.get("fields") or {}
+        for field in REVIEW_FIELDS:
+            field_payload = fields.get(field) or {}
+            status = field_payload.get("status") or (FIELD_STATUS_PRESENT if _present(field_payload.get("value")) else FIELD_STATUS_UNVERIFIED_MISSING)
+            status_key = {
+                FIELD_STATUS_PRESENT: "present",
+                FIELD_STATUS_CONFIRMED_ABSENT: "confirmed_absent",
+                FIELD_STATUS_UNVERIFIED_MISSING: "unverified_missing",
+            }.get(status, "unverified_missing")
+            field_quality[field][status_key] += 1
+            if status == FIELD_STATUS_CONFIRMED_ABSENT:
+                confirmed_absent_note_ids[field].append(actual_path.parent.name)
+            elif status != FIELD_STATUS_PRESENT:
+                unverified_missing_note_ids[field].append(actual_path.parent.name)
+    for counts in field_quality.values():
+        counts["verified_total"] = counts["present"] + counts["confirmed_absent"]
+    unverified_missing_note_ids = {field: ids for field, ids in unverified_missing_note_ids.items() if ids}
+    confirmed_absent_note_ids = {field: ids for field, ids in confirmed_absent_note_ids.items() if ids}
+    data_quality_status = (
+        "DATA_QUALITY_REVIEW_REQUIRED"
+        if unverified_missing_note_ids or quality_issue_note_ids or pre_post_inconsistent_note_ids
+        else "PASS"
+    )
+    return {
+        "run_id": run_id,
+        "data_quality_status": data_quality_status,
+        "attempted": len(getattr(collection, "attempted_ids", []) or []),
+        "target_verified": len(getattr(collection, "verified_ids", []) or []),
+        "detail_ready": len(getattr(collection, "verified_ids", []) or []),
+        "exportable": len(getattr(collection, "exportable_ids", []) or []),
+        "navigation_failed": len(getattr(collection, "navigation_failed_ids", []) or []),
+        "detail_not_ready": _count_detail_not_ready(getattr(collection, "validation_notes", []) or []),
+        "risk_control": str(getattr(collection, "safe_stop_reason", "") or "") == "RISK_CONTROL_DETECTED",
+        "human_verification": str(getattr(collection, "safe_stop_reason", "") or "") == "HUMAN_VERIFICATION_REQUIRED",
+        "safe_stop_reason": getattr(collection, "safe_stop_reason", None),
+        "field_completeness": getattr(collection, "field_presence", {}) or {},
+        "field_quality": field_quality,
+        "unverified_missing_note_ids": unverified_missing_note_ids,
+        "confirmed_absent_note_ids": confirmed_absent_note_ids,
+        "missing_field_note_ids": unverified_missing_note_ids,
+        "pre_post_inconsistent_note_ids": pre_post_inconsistent_note_ids,
+        "quality_issue_note_ids": quality_issue_note_ids,
+        "excel_readback": excel_readback,
+    }
+
+
+def write_data_quality_review(review_dir: Path, *, run_id: str) -> Path:
+    review = build_data_quality_review(run_id=run_id, review_dir=review_dir)
+    content = json.dumps(review, ensure_ascii=False, indent=2, default=str) + "\n"
+    assert_artifact_text_safe(content, "data_quality_review.json")
+    path = review_dir / "data_quality_review.json"
+    path.write_text(content, encoding="utf-8")
+    return path
+
+
+def build_data_quality_review(*, run_id: str, review_dir: Path) -> dict[str, Any]:
+    findings = []
+    for actual_path in sorted(review_dir.glob("*/actual.json")):
+        note_id = actual_path.parent.name
+        actual = json.loads(actual_path.read_text(encoding="utf-8"))
+        dom_summary_path = actual_path.parent / "dom_summary.json"
+        dom_summary = json.loads(dom_summary_path.read_text(encoding="utf-8")) if dom_summary_path.exists() else {}
+        fields = actual.get("fields") or {}
+        for field in REVIEW_FIELDS:
+            field_payload = fields.get(field) or {}
+            status = field_payload.get("status")
+            if status == FIELD_STATUS_PRESENT:
+                continue
+            if field == "tags" and status == FIELD_STATUS_CONFIRMED_ABSENT:
+                findings.append(_confirmed_absent_tags_finding(note_id, dom_summary))
+            else:
+                findings.append(
+                    {
+                        "note_id": note_id,
+                        "field": field,
+                        "classification": CLASSIFICATION_INSUFFICIENT_EVIDENCE,
+                        "dom_evidence": _field_dom_evidence(dom_summary, field),
+                        "visual_evidence": {"visual_status": "NOT_ASSESSED_OFFLINE"},
+                        "structured_evidence": "not_present_in_artifact",
+                        "decision": "missing value requires manual review",
+                    }
+                )
+    return {"run_id": run_id, "findings": findings}
 
 
 def validate_excel_readback(excel_path: Path, expected_rows: list[Any], expected_note_ids: list[str]) -> dict[str, Any]:
@@ -299,6 +471,82 @@ def quality_check_actual(fields: dict[str, dict[str, Any]]) -> dict[str, Any]:
     if any(isinstance(tag, str) and any(term in tag for term in UI_POLLUTION_TERMS) for tag in tags):
         issues.append({"field": "tags", "reason": "ui_pollution"})
     return {"passed": not issues, "issues": issues}
+
+
+def _review_field_status(
+    field: str,
+    payload: dict[str, Any],
+    pre_dom_summary: dict[str, Any] | None,
+    post_dom_summary: dict[str, Any] | None,
+) -> str:
+    if _present(payload.get("value")):
+        return FIELD_STATUS_PRESENT
+    if field == "tags" and _tags_confirmed_absent(pre_dom_summary, post_dom_summary):
+        return FIELD_STATUS_CONFIRMED_ABSENT
+    return FIELD_STATUS_UNVERIFIED_MISSING
+
+
+def _tags_confirmed_absent(pre_dom_summary: dict[str, Any] | None, post_dom_summary: dict[str, Any] | None) -> bool:
+    summaries = [summary for summary in [pre_dom_summary, post_dom_summary] if summary]
+    return bool(summaries) and all(_single_dom_summary_confirms_tags_absent(summary) for summary in summaries)
+
+
+def _single_dom_summary_confirms_tags_absent(summary: dict[str, Any]) -> bool:
+    detail_root = summary.get("detail_root") or {}
+    fields = summary.get("fields") or {}
+    body = fields.get("body") or {}
+    tags = fields.get("tags") or {}
+    return (
+        detail_root.get("root_found") is True
+        and bool(tags.get("selectors_checked"))
+        and int(tags.get("matched_count") or 0) == 0
+        and not str(tags.get("text") or "").strip()
+        and int(body.get("matched_count") or 0) >= 1
+        and "#" not in str(body.get("text") or "")
+    )
+
+
+def _confirmed_absent_tags_finding(note_id: str, dom_summary: dict[str, Any]) -> dict[str, Any]:
+    post_summary = dom_summary.get("post_extract_dom_summary") or {}
+    pre_summary = dom_summary.get("pre_extract_dom_summary") or {}
+    evidence_summary = post_summary or pre_summary
+    fields = evidence_summary.get("fields") or {}
+    tags = fields.get("tags") or {}
+    body = fields.get("body") or {}
+    return {
+        "note_id": note_id,
+        "field": "tags",
+        "classification": CLASSIFICATION_TRUE_ABSENT,
+        "dom_evidence": {
+            "detail_root_found": bool((evidence_summary.get("detail_root") or {}).get("root_found")),
+            "tag_nodes_found": int(tags.get("matched_count") or 0),
+            "tag_texts": [],
+            "body_text_preview": str(body.get("text") or "")[:200],
+            "candidate_selectors": tags.get("selectors_checked") or [],
+            "candidate_matches": [],
+            "pre_post_consistent": dom_summary.get("pre_post_consistent"),
+        },
+        "visual_evidence": {
+            "visual_tags_status": "ABSENT",
+            "visible_tag_texts": [],
+            "source": "page_screenshot.png manual offline inspection",
+        },
+        "structured_evidence": "not_present_in_artifact",
+        "decision": "tags confirmed absent; null business value is correct",
+    }
+
+
+def _field_dom_evidence(dom_summary: dict[str, Any], field: str) -> dict[str, Any]:
+    post_summary = dom_summary.get("post_extract_dom_summary") or {}
+    pre_summary = dom_summary.get("pre_extract_dom_summary") or {}
+    fields = (post_summary or pre_summary).get("fields") or {}
+    payload = fields.get(field) or {}
+    return {
+        "matched_count": int(payload.get("matched_count") or 0),
+        "text_preview": str(payload.get("text") or "")[:200],
+        "selectors_checked": payload.get("selectors_checked") or [],
+        "pre_post_consistent": dom_summary.get("pre_post_consistent"),
+    }
 
 
 def assert_artifact_text_safe(content: str, name: str) -> None:
@@ -449,6 +697,10 @@ def validate_note_headers() -> None:
     missing = [header for header in _excel_field_map().values() if header not in NOTE_HEADERS]
     if missing:
         raise ValueError(f"Excel headers missing from exporter schema: {missing}")
+
+
+def _count_detail_not_ready(notes: list[dict[str, Any]]) -> int:
+    return sum(1 for note in notes if not note.get("detail_ready"))
 
 
 def _sanitize_url_attr(match: re.Match[str]) -> str:

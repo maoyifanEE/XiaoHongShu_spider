@@ -1,0 +1,63 @@
+{
+  "note_id": "664c92e5000000001500804e",
+  "detail_ready": true,
+  "status": "OK",
+  "fields": {
+    "title": {
+      "value": "亲测有效｜30s教你打开排湿开关（详细教程）",
+      "source": "DOM_EXACT",
+      "status": "PRESENT"
+    },
+    "body": {
+      "value": "尊嘟有效！第二次极限艾灸祛湿气成功啦！还有艾灸时注意保暖，我是为了演示才穿的吊带。另外全程无广，可能穴位搭配没那么好，毕竟不是专业的，欢迎专业人士指正 #不懂就问有问必答 #祛湿气#养生 #上热下寒 #中焦不通",
+      "source": "DOM_EXACT",
+      "status": "PRESENT"
+    },
+    "note_type": {
+      "value": "视频",
+      "source": "DOM_EXACT",
+      "status": "PRESENT"
+    },
+    "publish_time": {
+      "value": "2024-05-29",
+      "source": "DOM_EXACT",
+      "status": "PRESENT"
+    },
+    "like_count": {
+      "value": 32000,
+      "source": "DOM_EXACT",
+      "raw": "3.2万",
+      "exact": false,
+      "status": "PRESENT"
+    },
+    "collect_count": {
+      "value": 24000,
+      "source": "DOM_EXACT",
+      "raw": "2.4万",
+      "exact": false,
+      "status": "PRESENT"
+    },
+    "comment_count": {
+      "value": 318,
+      "source": "DOM_EXACT",
+      "raw": "318",
+      "exact": true,
+      "status": "PRESENT"
+    },
+    "tags": {
+      "value": [
+        "上热下寒",
+        "不懂就问有问必答",
+        "中焦不通",
+        "养生",
+        "祛湿气"
+      ],
+      "source": "DOM_EXACT",
+      "status": "PRESENT"
+    }
+  },
+  "quality": {
+    "passed": true,
+    "issues": []
+  }
+}

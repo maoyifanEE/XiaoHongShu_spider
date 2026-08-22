@@ -1,0 +1,316 @@
+{
+  "note_id": "69de332f000000002301ea70",
+  "pre_extract_dom_summary": {
+    "note_id": "69de332f000000002301ea70",
+    "detail_root": {
+      "root_found": true,
+      "root_reason": "DETAIL_EVIDENCE_ROOT",
+      "detail_selector": "[class*=\"note-detail\"], [class*=\"noteDetail\"], [class*=\"NoteDetail\"], [data-testid*=\"note-detail\"], [role=\"dialog\"]",
+      "evidence_selector": "#detail-title, #detail-desc, .engage-bar, [class*=engage], [class*=interaction], [class*=Interact]",
+      "detail_root_count": 3,
+      "evidence_count": 12
+    },
+    "fields": {
+      "title": {
+        "selectors_checked": [
+          "#detail-title",
+          "h1",
+          "[class*=title]",
+          "[data-testid*=title]"
+        ],
+        "matched_count": 1,
+        "text": "📝记录人生第四次 小晕小倒"
+      },
+      "body": {
+        "selectors_checked": [
+          "#detail-desc",
+          "[class*=desc]",
+          "[class*=content]",
+          ".note-content",
+          "[data-testid*=content]"
+        ],
+        "matched_count": 1,
+        "text": "这周去查一下是什么原因\n还是太虚了\n#身体容易累 #那些煎熬着的日子 #年轻人身体就是好倒头就睡"
+      },
+      "publish_time": {
+        "selectors_checked": [
+          "detail root text"
+        ],
+        "matched_count": 1,
+        "text": "请刷新试试\n辣香郭\n关注\n📝记录人生第四次 小晕小倒\n这周去查一下是什么原因\n还是太虚了\n#身体容易累 #那些煎熬着的日子 #年轻人身体就是好倒头就睡\n猜你想搜\n昏死晕倒失去意识\n04-14\n共 3 条评论\n安期\n我滴郭，身体第一，其他都浮云\n04-14重庆\n赞\n回复\nFidelia也是乐呵妈\n长qt查一下\n04-15上海\n赞\n回复\n猴小猴（实习版）\n身体第一位 好好照顾自己呀\n04-14江西\n赞\n回复\n- THE END -\n\n说点什么...\n32\n5\n3\n发送\n取消"
+      },
+      "like_count": {
+        "selectors_checked": [
+          ".engage-bar .like-wrapper",
+          ".engage-bar [class*=like-wrapper]",
+          ".engage-bar [class*=likeWrapper]",
+          ".engage-bar [class*=Like]"
+        ],
+        "matched_count": 1,
+        "text": "32"
+      },
+      "collect_count": {
+        "selectors_checked": [
+          ".engage-bar .collect-wrapper",
+          ".engage-bar [class*=collect-wrapper]",
+          ".engage-bar [class*=collectWrapper]",
+          ".engage-bar [class*=Collect]"
+        ],
+        "matched_count": 1,
+        "text": "5"
+      },
+      "comment_count": {
+        "selectors_checked": [
+          ".engage-bar .chat-wrapper",
+          ".engage-bar [class*=chat-wrapper]",
+          ".engage-bar [class*=comment-wrapper]",
+          ".engage-bar [class*=Chat]",
+          ".engage-bar [class*=Comment]"
+        ],
+        "matched_count": 1,
+        "text": "3",
+        "zero_comment_evidence": {
+          "comment_area_found": true,
+          "comment_area_selector": "div.comments-el",
+          "comment_area_selectors_checked": [
+            "[class*=\"comments-container\"]",
+            "[class*=\"commentsContainer\"]",
+            "[class*=\"CommentsContainer\"]",
+            "[class*=\"comments-list\"]",
+            "[class*=\"commentsList\"]",
+            "[class*=\"CommentsList\"]",
+            "[class*=\"comment-list\"]",
+            "[class*=\"commentList\"]",
+            "[class*=\"CommentList\"]",
+            "[class*=\"comments-el\"]",
+            "[class*=\"commentsEl\"]",
+            "[class*=\"CommentsEl\"]",
+            "[data-testid*=\"comments\"]",
+            "[data-testid*=\"comment-list\"]"
+          ],
+          "comment_area_node": {
+            "tag": "div",
+            "id": "",
+            "class": "comments-el",
+            "data_testid": "",
+            "role": ""
+          },
+          "comment_area_ancestors": [
+            {
+              "tag": "div",
+              "id": "",
+              "class": "comments-el",
+              "data_testid": "",
+              "role": ""
+            },
+            {
+              "tag": "div",
+              "id": "",
+              "class": "note-scroller",
+              "data_testid": "",
+              "role": ""
+            },
+            {
+              "tag": "div",
+              "id": "",
+              "class": "interaction-container",
+              "data_testid": "",
+              "role": ""
+            },
+            {
+              "tag": "div",
+              "id": "noteContainer",
+              "class": "note-container",
+              "data_testid": "",
+              "role": ""
+            },
+            {
+              "tag": "div",
+              "id": "",
+              "class": "note-detail-mask",
+              "data_testid": "",
+              "role": ""
+            }
+          ],
+          "selectors_checked": [
+            "[class*=empty]",
+            "[class*=Empty]",
+            "[class*=placeholder]",
+            "[class*=Placeholder]",
+            "[data-testid*=empty]",
+            "[data-testid*=placeholder]"
+          ],
+          "matched_count": 0,
+          "text": ""
+        }
+      },
+      "tags": {
+        "selectors_checked": [
+          "#detail-desc a[href*=\"search\"]",
+          "#detail-desc a[href*=\"search_result\"]",
+          "a[href*=\"/search_result\"]",
+          "a[href*=\"/search\"]"
+        ],
+        "matched_count": 3,
+        "text": "#身体容易累\n#那些煎熬着的日子\n#年轻人身体就是好倒头就睡"
+      }
+    }
+  },
+  "post_extract_dom_summary": {
+    "note_id": "69de332f000000002301ea70",
+    "detail_root": {
+      "root_found": true,
+      "root_reason": "DETAIL_EVIDENCE_ROOT",
+      "detail_selector": "[class*=\"note-detail\"], [class*=\"noteDetail\"], [class*=\"NoteDetail\"], [data-testid*=\"note-detail\"], [role=\"dialog\"]",
+      "evidence_selector": "#detail-title, #detail-desc, .engage-bar, [class*=engage], [class*=interaction], [class*=Interact]",
+      "detail_root_count": 3,
+      "evidence_count": 12
+    },
+    "fields": {
+      "title": {
+        "selectors_checked": [
+          "#detail-title",
+          "h1",
+          "[class*=title]",
+          "[data-testid*=title]"
+        ],
+        "matched_count": 1,
+        "text": "📝记录人生第四次 小晕小倒"
+      },
+      "body": {
+        "selectors_checked": [
+          "#detail-desc",
+          "[class*=desc]",
+          "[class*=content]",
+          ".note-content",
+          "[data-testid*=content]"
+        ],
+        "matched_count": 1,
+        "text": "这周去查一下是什么原因\n还是太虚了\n#身体容易累 #那些煎熬着的日子 #年轻人身体就是好倒头就睡"
+      },
+      "publish_time": {
+        "selectors_checked": [
+          "detail root text"
+        ],
+        "matched_count": 1,
+        "text": "请刷新试试\n辣香郭\n关注\n📝记录人生第四次 小晕小倒\n这周去查一下是什么原因\n还是太虚了\n#身体容易累 #那些煎熬着的日子 #年轻人身体就是好倒头就睡\n猜你想搜\n昏死晕倒失去意识\n04-14\n共 3 条评论\n安期\n我滴郭，身体第一，其他都浮云\n04-14重庆\n赞\n回复\nFidelia也是乐呵妈\n长qt查一下\n04-15上海\n赞\n回复\n猴小猴（实习版）\n身体第一位 好好照顾自己呀\n04-14江西\n赞\n回复\n- THE END -\n\n说点什么...\n32\n5\n3\n发送\n取消"
+      },
+      "like_count": {
+        "selectors_checked": [
+          ".engage-bar .like-wrapper",
+          ".engage-bar [class*=like-wrapper]",
+          ".engage-bar [class*=likeWrapper]",
+          ".engage-bar [class*=Like]"
+        ],
+        "matched_count": 1,
+        "text": "32"
+      },
+      "collect_count": {
+        "selectors_checked": [
+          ".engage-bar .collect-wrapper",
+          ".engage-bar [class*=collect-wrapper]",
+          ".engage-bar [class*=collectWrapper]",
+          ".engage-bar [class*=Collect]"
+        ],
+        "matched_count": 1,
+        "text": "5"
+      },
+      "comment_count": {
+        "selectors_checked": [
+          ".engage-bar .chat-wrapper",
+          ".engage-bar [class*=chat-wrapper]",
+          ".engage-bar [class*=comment-wrapper]",
+          ".engage-bar [class*=Chat]",
+          ".engage-bar [class*=Comment]"
+        ],
+        "matched_count": 1,
+        "text": "3",
+        "zero_comment_evidence": {
+          "comment_area_found": true,
+          "comment_area_selector": "div.comments-el",
+          "comment_area_selectors_checked": [
+            "[class*=\"comments-container\"]",
+            "[class*=\"commentsContainer\"]",
+            "[class*=\"CommentsContainer\"]",
+            "[class*=\"comments-list\"]",
+            "[class*=\"commentsList\"]",
+            "[class*=\"CommentsList\"]",
+            "[class*=\"comment-list\"]",
+            "[class*=\"commentList\"]",
+            "[class*=\"CommentList\"]",
+            "[class*=\"comments-el\"]",
+            "[class*=\"commentsEl\"]",
+            "[class*=\"CommentsEl\"]",
+            "[data-testid*=\"comments\"]",
+            "[data-testid*=\"comment-list\"]"
+          ],
+          "comment_area_node": {
+            "tag": "div",
+            "id": "",
+            "class": "comments-el",
+            "data_testid": "",
+            "role": ""
+          },
+          "comment_area_ancestors": [
+            {
+              "tag": "div",
+              "id": "",
+              "class": "comments-el",
+              "data_testid": "",
+              "role": ""
+            },
+            {
+              "tag": "div",
+              "id": "",
+              "class": "note-scroller",
+              "data_testid": "",
+              "role": ""
+            },
+            {
+              "tag": "div",
+              "id": "",
+              "class": "interaction-container",
+              "data_testid": "",
+              "role": ""
+            },
+            {
+              "tag": "div",
+              "id": "noteContainer",
+              "class": "note-container",
+              "data_testid": "",
+              "role": ""
+            },
+            {
+              "tag": "div",
+              "id": "",
+              "class": "note-detail-mask",
+              "data_testid": "",
+              "role": ""
+            }
+          ],
+          "selectors_checked": [
+            "[class*=empty]",
+            "[class*=Empty]",
+            "[class*=placeholder]",
+            "[class*=Placeholder]",
+            "[data-testid*=empty]",
+            "[data-testid*=placeholder]"
+          ],
+          "matched_count": 0,
+          "text": ""
+        }
+      },
+      "tags": {
+        "selectors_checked": [
+          "#detail-desc a[href*=\"search\"]",
+          "#detail-desc a[href*=\"search_result\"]",
+          "a[href*=\"/search_result\"]",
+          "a[href*=\"/search\"]"
+        ],
+        "matched_count": 3,
+        "text": "#身体容易累\n#那些煎熬着的日子\n#年轻人身体就是好倒头就睡"
+      }
+    }
+  },
+  "pre_post_consistent": true
+}

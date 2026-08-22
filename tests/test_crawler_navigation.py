@@ -270,17 +270,17 @@ def test_exact_detail_state_overrides_weaker_response_record():
         "note_id": note_id,
         "title": "exact title",
         "liked_count": "12",
-        "share_count": "3",
+        "comment_count": "3",
         "tags": ["详情"],
     }
     merged = merge_public_note_records(existing, incoming, note_id, prefer_incoming=True, incoming_source="DETAIL_INITIAL_STATE")
     assert merged["title"] == "exact title"
     assert merged["liked_count"] == "12"
-    assert merged["share_count"] == "3"
+    assert merged["comment_count"] == "3"
     assert merged["tags"] == ["列表", "详情"]
     assert merged["_structured_source"] == "DETAIL_INITIAL_STATE"
     assert merged["_field_sources"]["title"] == "DETAIL_INITIAL_STATE"
-    assert merged["_field_sources"]["share_count"] == "DETAIL_INITIAL_STATE"
+    assert merged["_field_sources"]["comment_count"] == "DETAIL_INITIAL_STATE"
 
 
 def test_later_partial_response_does_not_erase_existing_public_fields(tmp_path: Path):
@@ -291,7 +291,7 @@ def test_later_partial_response_does_not_erase_existing_public_fields(tmp_path: 
     crawler._capture_structured(
         "run",
         "https://www.xiaohongshu.com/api/sns/web/v1/feed",
-        {"id": note_id, "title": "完整", "interactInfo": {"likedCount": "11", "shareCount": "2"}, "tagList": [{"name": "A"}]},
+        {"id": note_id, "title": "完整", "interactInfo": {"likedCount": "11", "commentCount": "2"}, "tagList": [{"name": "A"}]},
     )
     crawler._capture_structured(
         "run",
@@ -301,7 +301,7 @@ def test_later_partial_response_does_not_erase_existing_public_fields(tmp_path: 
     record = crawler.structured_by_note[note_id]
     assert record["title"] == "完整"
     assert record["liked_count"] == "11"
-    assert record["share_count"] == "2"
+    assert record["comment_count"] == "2"
     assert record["tags"] == ["A"]
 
     crawler2 = Crawler(app_config(tmp_path), DummyDb(), DummyLogger())
@@ -318,26 +318,26 @@ def test_same_payload_note_records_merge_non_destructively():
     records = extract_public_note_records(
         {
             "items": [
-                {"noteId": note_id, "title": "完整", "likedCount": "11", "shareCount": "2", "tagList": [{"name": "A"}]},
+                {"noteId": note_id, "title": "完整", "likedCount": "11", "commentCount": "2", "tagList": [{"name": "A"}]},
                 {"noteId": note_id, "title": "标题-only"},
             ]
         }
     )
     assert records[note_id]["title"] == "完整"
     assert records[note_id]["liked_count"] == "11"
-    assert records[note_id]["share_count"] == "2"
+    assert records[note_id]["comment_count"] == "2"
     assert records[note_id]["tags"] == ["A"]
 
 
 def test_same_payload_note_merge_is_order_independent():
     note_id = "66dabcde000000001f01abcd"
-    rich = {"noteId": note_id, "title": "完整", "likedCount": "11", "shareCount": "2", "tagList": [{"name": "A"}]}
+    rich = {"noteId": note_id, "title": "完整", "likedCount": "11", "commentCount": "2", "tagList": [{"name": "A"}]}
     sparse = {"noteId": note_id, "title": "标题-only"}
     first = extract_public_note_records({"items": [rich, sparse]})[note_id]
     second = extract_public_note_records({"items": [sparse, rich]})[note_id]
     assert first["title"] == second["title"] == "完整"
     assert first["liked_count"] == second["liked_count"] == "11"
-    assert first["share_count"] == second["share_count"] == "2"
+    assert first["comment_count"] == second["comment_count"] == "2"
     assert first["tags"] == second["tags"] == ["A"]
 
 
@@ -508,7 +508,7 @@ def test_field_level_structured_provenance():
     note_id = "66dabcde000000001f01abcd"
     record = merge_public_note_records(
         {"note_id": note_id, "title": "T", "liked_count": "1"},
-        {"note_id": note_id, "share_count": "9"},
+        {"note_id": note_id, "comment_count": "9"},
         note_id,
         prefer_incoming=False,
         incoming_source="PAGE_RESPONSE",
@@ -516,7 +516,7 @@ def test_field_level_structured_provenance():
     record = merge_public_note_records(record, {"note_id": note_id, "liked_count": "2"}, note_id, prefer_incoming=True, incoming_source="DETAIL_INITIAL_STATE")
     assert record["_field_sources"]["title"] == "PAGE_RESPONSE"
     assert record["_field_sources"]["like_count"] == "DETAIL_INITIAL_STATE"
-    assert record["_field_sources"]["share_count"] == "PAGE_RESPONSE"
+    assert record["_field_sources"]["comment_count"] == "PAGE_RESPONSE"
 
 
 def test_weaker_page_response_cannot_override_detail_initial_state():
@@ -530,25 +530,25 @@ def test_weaker_page_response_cannot_override_detail_initial_state():
     )
     record = merge_public_note_records(
         record,
-        {"note_id": note_id, "title": "page-title", "liked_count": "99", "share_count": "3", "tags": ["A"]},
+        {"note_id": note_id, "title": "page-title", "liked_count": "99", "comment_count": "3", "tags": ["A"]},
         note_id,
         prefer_incoming=False,
         incoming_source="PAGE_RESPONSE",
     )
     assert record["title"] == "detail-title"
     assert record["liked_count"] == "100"
-    assert record["share_count"] == "3"
+    assert record["comment_count"] == "3"
     assert record["tags"] == ["A"]
     assert record["_field_sources"]["title"] == "DETAIL_INITIAL_STATE"
     assert record["_field_sources"]["like_count"] == "DETAIL_INITIAL_STATE"
-    assert record["_field_sources"]["share_count"] == "PAGE_RESPONSE"
+    assert record["_field_sources"]["comment_count"] == "PAGE_RESPONSE"
 
 
 def test_stronger_detail_initial_state_overrides_page_response():
     note_id = "66dabcde000000001f01abcd"
     record = merge_public_note_records(
         None,
-        {"note_id": note_id, "title": "page-title", "liked_count": "90", "share_count": "3"},
+        {"note_id": note_id, "title": "page-title", "liked_count": "90", "comment_count": "3"},
         note_id,
         prefer_incoming=False,
         incoming_source="PAGE_RESPONSE",
@@ -562,10 +562,10 @@ def test_stronger_detail_initial_state_overrides_page_response():
     )
     assert record["title"] == "detail-title"
     assert record["liked_count"] == "100"
-    assert record["share_count"] == "3"
+    assert record["comment_count"] == "3"
     assert record["_field_sources"]["title"] == "DETAIL_INITIAL_STATE"
     assert record["_field_sources"]["like_count"] == "DETAIL_INITIAL_STATE"
-    assert record["_field_sources"]["share_count"] == "PAGE_RESPONSE"
+    assert record["_field_sources"]["comment_count"] == "PAGE_RESPONSE"
 
 
 def test_structured_field_source_normalization_is_idempotent():
@@ -577,7 +577,6 @@ def test_structured_field_source_normalization_is_idempotent():
         "like_count": "PAGE_RESPONSE",
         "collect_count": "PAGE_RESPONSE",
         "comment_count": "PAGE_RESPONSE",
-        "share_count": "PAGE_RESPONSE",
         "tags": "PAGE_RESPONSE+DETAIL_INITIAL_STATE",
     }
     once = _normalize_structured_field_sources(sources)
@@ -590,7 +589,7 @@ def test_body_provenance_survives_multiple_merges():
     record = merge_public_note_records(None, {"note_id": note_id, "content": "正文"}, note_id, prefer_incoming=False, incoming_source="PAGE_RESPONSE")
     assert record["content"] == "正文"
     assert record["_field_sources"]["body"] == "PAGE_RESPONSE"
-    record = merge_public_note_records(record, {"note_id": note_id, "share_count": "3"}, note_id, prefer_incoming=False, incoming_source="PAGE_RESPONSE")
+    record = merge_public_note_records(record, {"note_id": note_id, "comment_count": "3"}, note_id, prefer_incoming=False, incoming_source="PAGE_RESPONSE")
     assert record["content"] == "正文"
     assert record["_field_sources"]["body"] == "PAGE_RESPONSE"
     record = merge_public_note_records(record, {"note_id": note_id, "desc": "详情正文"}, note_id, prefer_incoming=True, incoming_source="DETAIL_INITIAL_STATE")
@@ -646,7 +645,7 @@ def test_canonical_metric_provenance():
     note_id = "66dabcde000000001f01abcd"
     record = merge_public_note_records(
         None,
-        {"note_id": note_id, "liked_count": "1", "collected_count": "2", "comment_count": "3", "share_count": "4"},
+        {"note_id": note_id, "liked_count": "1", "collected_count": "2", "comment_count": "3"},
         note_id,
         prefer_incoming=False,
         incoming_source="PAGE_RESPONSE",
@@ -654,7 +653,6 @@ def test_canonical_metric_provenance():
     assert record["_field_sources"]["like_count"] == "PAGE_RESPONSE"
     assert record["_field_sources"]["collect_count"] == "PAGE_RESPONSE"
     assert record["_field_sources"]["comment_count"] == "PAGE_RESPONSE"
-    assert record["_field_sources"]["share_count"] == "PAGE_RESPONSE"
 
 
 def test_comment_response_path_skips_structured_extraction(tmp_path: Path):
@@ -1323,7 +1321,7 @@ def test_extract_initial_state_note_record_uses_exact_note_detail_map(tmp_path: 
                             desc: "B",
                             type: "normal",
                             time: 1234567890000,
-                            interactInfo: {likedCount: "123", collectedCount: "45", commentCount: "6", shareCount: "7"},
+                            interactInfo: {likedCount: "123", collectedCount: "45", commentCount: "6"},
                             tagList: [{name: "杭州"}, {name: "旅行"}],
                             privatePayload: {x: 1}
                           }
@@ -1343,7 +1341,6 @@ def test_extract_initial_state_note_record_uses_exact_note_detail_map(tmp_path: 
     assert record["liked_count"] == "123"
     assert record["collected_count"] == "45"
     assert record["comment_count"] == "6"
-    assert record["share_count"] == "7"
     assert record["tags"] == ["旅行", "杭州"]
     assert "privatePayload" not in str(record)
 

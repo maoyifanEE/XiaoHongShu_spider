@@ -30,7 +30,6 @@ def test_validation_artifact_schema(tmp_path: Path):
                 "likes_value": 1,
                 "collects_value": 2,
                 "comments_value": 3,
-                "shares_value": 4,
                 "hashtags": ["标签"],
                 "field_sources": {
                     "title": "DOM_EXACT",
@@ -40,7 +39,6 @@ def test_validation_artifact_schema(tmp_path: Path):
                     "like_count": "DOM_EXACT",
                     "collect_count": "DOM_EXACT",
                     "comment_count": "DOM_EXACT",
-                    "share_count": "DETAIL_INITIAL_STATE",
                     "tags": "DOM_EXACT",
                 },
             },
@@ -65,7 +63,7 @@ def test_validation_artifact_schema(tmp_path: Path):
     assert summary["exportable"] == 1
     assert summary["detail_not_ready"] == 0
     assert summary["fields"]["title"] == {"value_present": 1, "source": {"DOM_EXACT": 1}}
-    assert summary["fields"]["share_count"] == {"value_present": 1, "source": {"DETAIL_INITIAL_STATE": 1}}
+    assert "share_count" not in summary["fields"]
 
     with (artifact_dir / "field_validation.csv").open("r", encoding="utf-8-sig", newline="") as handle:
         rows = list(csv.DictReader(handle))
@@ -74,7 +72,8 @@ def test_validation_artifact_schema(tmp_path: Path):
     assert rows[0]["title"] == "标题"
     assert rows[0]["source_title"] == "DOM_EXACT"
     assert rows[0]["source_body"] == "DOM_EXACT"
-    assert json.loads(rows[0]["source_metrics"])["share_count"] == "DETAIL_INITIAL_STATE"
+    assert "share_count" not in rows[0]
+    assert set(json.loads(rows[0]["source_metrics"])) == {"like_count", "collect_count", "comment_count"}
 
 
 def test_validation_artifact_no_sensitive_fields(tmp_path: Path):

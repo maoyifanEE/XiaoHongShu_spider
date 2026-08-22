@@ -1,0 +1,62 @@
+{
+  "run_id": "2026-08-22T085905_0800_3d25274d",
+  "status": "SUCCESS",
+  "login_status": "LOGIN_OK",
+  "notes_discovered": 5,
+  "attempted": 5,
+  "target_verified": 5,
+  "exportable": 5,
+  "navigation_failed": 0,
+  "detail_not_ready": 0,
+  "safe_stop_reason": null,
+  "fields": {
+    "title": {
+      "value_present": 5,
+      "source": {
+        "DOM_EXACT": 5
+      }
+    },
+    "body": {
+      "value_present": 5,
+      "source": {
+        "DOM_EXACT": 5
+      }
+    },
+    "note_type": {
+      "value_present": 5,
+      "source": {
+        "DOM_EXACT": 5
+      }
+    },
+    "publish_time": {
+      "value_present": 5,
+      "source": {
+        "DOM_EXACT": 5
+      }
+    },
+    "like_count": {
+      "value_present": 5,
+      "source": {
+        "DOM_EXACT": 5
+      }
+    },
+    "collect_count": {
+      "value_present": 5,
+      "source": {
+        "DOM_EXACT": 5
+      }
+    },
+    "comment_count": {
+      "value_present": 5,
+      "source": {
+        "DOM_EXACT": 5
+      }
+    },
+    "tags": {
+      "value_present": 5,
+      "source": {
+        "DOM_EXACT": 5
+      }
+    }
+  }
+}

@@ -306,9 +306,8 @@ class Database:
                 """
                 INSERT INTO note_metrics_snapshots
                 (note_id, captured_at, likes_value, likes_raw, likes_is_exact, collects_value,
-                 collects_raw, collects_is_exact, comments_value, comments_raw, comments_is_exact,
-                 shares_value, shares_raw, shares_is_exact, source)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                 collects_raw, collects_is_exact, comments_value, comments_raw, comments_is_exact, source)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     note_id,
@@ -322,36 +321,9 @@ class Database:
                     note.get("comments_value"),
                     note.get("comments_raw"),
                     _bool(note.get("comments_is_exact")),
-                    note.get("shares_value"),
-                    note.get("shares_raw"),
-                    _bool(note.get("shares_is_exact")),
                     note.get("source", "dom"),
                 ),
             )
-            for comment in note.get("top_comments", []):
-                self.conn.execute(
-                    """
-                    INSERT OR IGNORE INTO top_comments
-                    (note_id, captured_at, sorting_mode, comment_rank, comment_id, author_name, body,
-                     likes_value, likes_raw, likes_is_exact, is_creator, is_pinned, source)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                    """,
-                    (
-                        note_id,
-                        captured_at,
-                        comment.get("sorting_mode", "default_ui_order"),
-                        comment.get("rank"),
-                        comment.get("comment_id"),
-                        comment.get("author_name"),
-                        comment.get("body"),
-                        comment.get("likes_value"),
-                        comment.get("likes_raw"),
-                        _bool(comment.get("likes_is_exact")),
-                        _bool(comment.get("is_creator")),
-                        _bool(comment.get("is_pinned")),
-                        comment.get("source", "dom"),
-                    ),
-                )
 
     def save_raw(self, run_id: str, entity_type: str, entity_id: str, source: str, raw: Any) -> None:
         payload = json.dumps(sanitize_json(raw), ensure_ascii=False, sort_keys=True, default=str)
@@ -388,7 +360,6 @@ class Database:
                    latest_metrics.likes_value, latest_metrics.likes_raw, latest_metrics.likes_is_exact,
                    latest_metrics.collects_value, latest_metrics.collects_raw, latest_metrics.collects_is_exact,
                    latest_metrics.comments_value, latest_metrics.comments_raw, latest_metrics.comments_is_exact,
-                   latest_metrics.shares_value, latest_metrics.shares_raw, latest_metrics.shares_is_exact,
                    latest_metrics.captured_at AS metrics_captured_at
             FROM notes
             LEFT JOIN latest_content ON latest_content.note_id = notes.note_id

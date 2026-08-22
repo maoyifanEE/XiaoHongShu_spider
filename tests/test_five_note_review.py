@@ -5,10 +5,32 @@ from openpyxl import Workbook
 
 from xhs_profile_exporter.exporter import NOTE_HEADERS
 from xhs_profile_exporter.five_note_review import (
+    REVIEW_FIELDS,
     assert_artifact_text_safe,
     quality_check_actual,
     validate_excel_readback,
 )
+
+
+def test_five_note_review_fields_are_final_product_scope():
+    assert REVIEW_FIELDS == [
+        "title",
+        "body",
+        "note_type",
+        "publish_time",
+        "like_count",
+        "collect_count",
+        "comment_count",
+        "tags",
+    ]
+
+
+def test_excel_headers_exclude_removed_fields():
+    assert "分享数" not in NOTE_HEADERS
+    assert "分享原始显示" not in NOTE_HEADERS
+    assert "分享是否精确" not in NOTE_HEADERS
+    assert not any(header.startswith(("评论1_", "评论2_", "评论3_")) for header in NOTE_HEADERS)
+    assert {"评论数", "评论原始显示", "评论是否精确"}.issubset(set(NOTE_HEADERS))
 
 
 def test_excel_readback_numeric_normalization(tmp_path: Path):
@@ -40,8 +62,8 @@ def test_excel_readback_numeric_normalization(tmp_path: Path):
 
 
 def test_excel_readback_none_and_blank_are_equal(tmp_path: Path):
-    path = _workbook(tmp_path, [_excel_row(note_id="note1", body=None, shares_value=None, shares_raw=None, shares_is_exact=None)])
-    row = _db_row(note_id="note1", body=None, shares_value=None, shares_raw=None, shares_is_exact=None)
+    path = _workbook(tmp_path, [_excel_row(note_id="note1", body=None)])
+    row = _db_row(note_id="note1", body=None)
     report = validate_excel_readback(path, [row], ["note1"])
     assert report["field_diffs"] == []
 
@@ -111,9 +133,6 @@ def _excel_row(**overrides):
         "评论数": 0,
         "评论原始显示": "0",
         "评论是否精确": "是",
-        "分享数": None,
-        "分享原始显示": None,
-        "分享是否精确": None,
         "标签": "A B",
     }
     key_map = {
@@ -131,9 +150,6 @@ def _excel_row(**overrides):
         "comments_value": "评论数",
         "comments_raw": "评论原始显示",
         "comments_is_exact": "评论是否精确",
-        "shares_value": "分享数",
-        "shares_raw": "分享原始显示",
-        "shares_is_exact": "分享是否精确",
         "tags": "标签",
     }
     for key, value in overrides.items():
@@ -157,9 +173,6 @@ def _db_row(**overrides):
         "comments_value": 0,
         "comments_raw": "0",
         "comments_is_exact": 1,
-        "shares_value": None,
-        "shares_raw": None,
-        "shares_is_exact": None,
         "hashtags": json.dumps(["A", "B"], ensure_ascii=False),
     }
     row.update(overrides)

@@ -1,6 +1,7 @@
 {
   "note_id": "664c92e5000000001500804e",
   "detail_ready": true,
+  "status": "OK",
   "fields": {
     "title": {
       "value": "亲测有效｜30s教你打开排湿开关（详细教程）",
@@ -16,23 +17,25 @@
     },
     "publish_time": {
       "value": "2024-05-29",
-      "source": "DOM_EXACT",
-      "raw_display": "2024-05-29"
+      "source": "DOM_EXACT"
     },
     "like_count": {
       "value": 32000,
       "source": "DOM_EXACT",
-      "raw_display": "3.2万"
+      "raw": "3.2万",
+      "exact": false
     },
     "collect_count": {
       "value": 24000,
       "source": "DOM_EXACT",
-      "raw_display": "2.4万"
+      "raw": "2.4万",
+      "exact": false
     },
     "comment_count": {
       "value": 318,
       "source": "DOM_EXACT",
-      "raw_display": "318"
+      "raw": "318",
+      "exact": true
     },
     "tags": {
       "value": [
@@ -45,9 +48,8 @@
       "source": "DOM_EXACT"
     }
   },
-  "raw_display": {
-    "like_raw": "3.2万",
-    "collect_raw": "2.4万",
-    "comment_raw": "318"
+  "quality": {
+    "passed": true,
+    "issues": []
   }
 }

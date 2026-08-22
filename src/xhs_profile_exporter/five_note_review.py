@@ -21,7 +21,6 @@ REVIEW_FIELDS = [
     "like_count",
     "collect_count",
     "comment_count",
-    "share_count",
     "tags",
 ]
 
@@ -170,7 +169,6 @@ async def capture_five_note_review_state(page: Any, note_id: str) -> dict[str, A
             like_count: metric([".engage-bar .like-wrapper", ".engage-bar [class*=like-wrapper]", ".engage-bar [class*=likeWrapper]", ".engage-bar [class*=Like]"]),
             collect_count: metric([".engage-bar .collect-wrapper", ".engage-bar [class*=collect-wrapper]", ".engage-bar [class*=collectWrapper]", ".engage-bar [class*=Collect]"]),
             comment_count: {...metric([".engage-bar .chat-wrapper", ".engage-bar [class*=chat-wrapper]", ".engage-bar [class*=comment-wrapper]", ".engage-bar [class*=Chat]", ".engage-bar [class*=Comment]"]), zero_comment_evidence: zeroCommentEvidence()},
-            share_count: metric([".engage-bar .share-wrapper", ".engage-bar [class*=share-wrapper]", ".engage-bar [class*=shareWrapper]", ".engage-bar [class*=Share]"]),
             tags: {selectors_checked: ['#detail-desc a[href*="search"]', '#detail-desc a[href*="search_result"]', 'a[href*="/search_result"]', 'a[href*="/search"]'], matched_count: root ? root.querySelectorAll('#detail-desc a[href*="search"], #detail-desc a[href*="search_result"], a[href*="/search_result"], a[href*="/search"]').length : 0, text: root ? Array.from(root.querySelectorAll('#detail-desc a[href*="search"], #detail-desc a[href*="search_result"], a[href*="/search_result"], a[href*="/search"]')).map((el) => clean(el)).filter(Boolean).join("\\n") : ""}
           };
           return {
@@ -204,7 +202,6 @@ def build_actual_payload(note: dict[str, Any]) -> dict[str, Any]:
         "like_count": _field(note.get("likes_value"), sources.get("like_count"), note.get("likes_raw"), note.get("likes_is_exact")),
         "collect_count": _field(note.get("collects_value"), sources.get("collect_count"), note.get("collects_raw"), note.get("collects_is_exact")),
         "comment_count": _field(note.get("comments_value"), sources.get("comment_count"), note.get("comments_raw"), note.get("comments_is_exact")),
-        "share_count": _field(note.get("shares_value"), sources.get("share_count"), note.get("shares_raw"), note.get("shares_is_exact")),
         "tags": _field(note.get("hashtags") or [], sources.get("tags")),
     }
     return {
@@ -285,9 +282,6 @@ def write_excel_readback_artifact(review_dir: Path, report: dict[str, Any], exce
     assert_artifact_text_safe(content, "excel_readback.json")
     path = review_dir / "excel_readback.json"
     path.write_text(content, encoding="utf-8")
-    if excel_path and excel_path.exists():
-        target = review_dir / excel_path.name
-        shutil.copyfile(excel_path, target)
     return path
 
 
@@ -346,7 +340,7 @@ def _present(value: Any) -> bool:
 def _dom_summaries_consistent(pre: dict[str, Any], post: dict[str, Any]) -> bool:
     pre_fields = (pre or {}).get("fields") or {}
     post_fields = (post or {}).get("fields") or {}
-    for field in ["title", "body", "publish_time", "like_count", "collect_count", "comment_count", "share_count", "tags"]:
+    for field in REVIEW_FIELDS:
         if (pre_fields.get(field) or {}).get("text") != (post_fields.get(field) or {}).get("text"):
             return False
     return True
@@ -367,9 +361,6 @@ def _excel_field_map() -> dict[str, str]:
         "comment_count": "评论数",
         "comment_raw": "评论原始显示",
         "comment_exact": "评论是否精确",
-        "share_count": "分享数",
-        "share_raw": "分享原始显示",
-        "share_exact": "分享是否精确",
         "tags": "标签",
     }
 
@@ -385,9 +376,6 @@ def _expected_db_value(row: Any, field: str) -> Any:
         "comment_count": "comments_value",
         "comment_raw": "comments_raw",
         "comment_exact": "comments_is_exact",
-        "share_count": "shares_value",
-        "share_raw": "shares_raw",
-        "share_exact": "shares_is_exact",
         "tags": "hashtags",
     }
     value = row[key_map.get(field, field)]

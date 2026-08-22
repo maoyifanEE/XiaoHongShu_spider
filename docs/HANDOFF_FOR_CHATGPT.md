@@ -1,5 +1,21 @@
 # Handoff for ChatGPT / Code Review
 
+## Current Product Scope - 2026-08-22
+
+Active public note fields are now:
+
+`note_id`, `title`, `body`, `note_type`, `publish_time`, `like_count`, `collect_count`, `comment_count`, `tags`.
+
+Out of scope and removed from active parsing, export, validation, and review artifacts:
+
+- share count / share raw display / share exactness
+- comment bodies
+- comment lists, top comments, pinned comments, or first-three comment exports
+
+`comment_count` remains in scope. Comment-area scoped evidence remains in scope only for zero-comment evidence and for preventing comment text from polluting note body/tags.
+
+SQLite keeps legacy `shares_*` columns and the `top_comments` table for old database compatibility, but active save/export/QA paths do not write or read them. Historical sections below may mention retired fields from earlier validation rounds; they are not the current product contract.
+
 ## Golden Truth Hardening - 2026-08-21
 
 Baseline before this hardening pass:
@@ -116,7 +132,6 @@ Target creator currently configured:
   - `notes`
   - `note_content_versions`
   - `note_metrics_snapshots`
-  - `top_comments`
   - `raw_records`
 - Checkpoint file model.
 - Login states:
@@ -127,7 +142,6 @@ Target creator currently configured:
 - Offline QA checks:
   - foreign key integrity
   - duplicate note_id
-  - duplicate comment rank
   - negative counts
   - rank range
   - current note uniqueness

@@ -8,6 +8,14 @@
 
 双击 `start.bat`。脚本会自动创建 `.venv`、安装依赖、安装项目内 Playwright Chromium、检查配置、启动采集、写入 SQLite、导出 Excel 并执行离线 QA。
 
+## 当前产品字段
+
+公开笔记最终采集和导出的字段为：
+
+`note_id`、`title`、`body`、`note_type`、`publish_time`、`like_count`、`collect_count`、`comment_count`、`tags`。
+
+当前明确不采集、不导出：分享数、分享原始显示、分享是否精确、评论正文、评论列表、置顶评论或前三条评论。程序仍保留评论区范围识别，仅用于判断明确的 0 评论证据和避免正文/标签污染。
+
 首次运行如果未登录，会打开一个可见浏览器窗口并提示：
 
 ```text
@@ -66,7 +74,7 @@ creators:
 - `debug-extract`：对指定 `--note-id` 生成单帖字段核对报告，输出到 `debug/live_extract/<run_id>/extraction_report.json`，用于开发阶段人工审查字段来源和 DOM 证据。
 - `golden-live`：只验证 `tests/fixtures/golden_notes/` 中的固定笔记，使用当前生产 extractor 的 live 结果直接对比人工 fixture，并输出 `validation/golden_review/<note_id>/` 审查材料。
 
-Golden fixture 字段使用 `exact`、`missing`、`skip` 三种断言语义；`skip` 字段会记录 live actual/source，但不参与 PASS/FAIL。
+Golden fixture 字段使用 `exact`、`missing`、`skip` 三种断言语义；`skip` 字段会记录 live actual/source，但不参与 PASS/FAIL。当前 golden 范围只覆盖上面的 8 个业务字段，不包含分享或评论正文。
 
 ## 数据质量规则
 
@@ -74,7 +82,7 @@ Golden fixture 字段使用 `exact`、`missing`、`skip` 三种断言语义；`s
 - `999` 这类完整数字标记为精确。
 - `1.2万`、`3.2w` 这类 UI 缩写会转为近似值，并标记为非精确。
 - Excel 每次从 SQLite 生成，不作为增量数据源。
-- 评论保存当前页面默认排序下实际显示的前三条一级评论，并记录采集时间和排序模式。
+- `comment_count` 是笔记互动数；不会保存评论正文、评论作者或评论列表。
 
 ## 安全停止
 

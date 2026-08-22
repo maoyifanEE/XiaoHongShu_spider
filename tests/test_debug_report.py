@@ -21,7 +21,6 @@ def test_debug_extract_report_schema(tmp_path: Path):
             "likes_value": 1,
             "collects_value": 2,
             "comments_value": 3,
-            "shares_value": 4,
             "hashtags": ["标签"],
             "field_sources": {
                 "title": "DOM_EXACT",
@@ -31,7 +30,6 @@ def test_debug_extract_report_schema(tmp_path: Path):
                 "like_count": "DOM_EXACT",
                 "collect_count": "DOM_EXACT",
                 "comment_count": "DOM_EXACT",
-                "share_count": "DETAIL_INITIAL_STATE",
                 "tags": "DOM_EXACT",
             },
         },
@@ -53,7 +51,6 @@ def test_debug_extract_report_schema(tmp_path: Path):
         "like_count",
         "collect_count",
         "comment_count",
-        "share_count",
         "tags",
     }
     assert saved["fields"]["title"]["source"] == "DOM_EXACT"
@@ -62,8 +59,7 @@ def test_debug_extract_report_schema(tmp_path: Path):
         assert "value" in field
         assert "source" in field
         assert "dom_evidence_preview" in field
-    assert saved["fields"]["share_count"]["source"] == "DETAIL_INITIAL_STATE"
-    assert saved["fields"]["share_count"]["confidence"] == "high"
+    assert "share_count" not in saved["fields"]
     assert saved["dom_summary"]["selectors_checked"] == ["#detail-title", "#detail-desc"]
 
 

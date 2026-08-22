@@ -13,7 +13,6 @@ DEBUG_FIELDS = [
     "like_count",
     "collect_count",
     "comment_count",
-    "share_count",
     "tags",
 ]
 
@@ -40,7 +39,6 @@ FIELD_DOM_SELECTORS = {
     "like_count": [".engage-bar .like-wrapper"],
     "collect_count": [".engage-bar .collect-wrapper"],
     "comment_count": [".engage-bar .chat-wrapper"],
-    "share_count": [".engage-bar .share-wrapper"],
     "tags": ['#detail-desc a[href*="search"]', 'a[href*="/search"]'],
 }
 
@@ -64,7 +62,6 @@ def build_extraction_report(
         "like_count": _field(note.get("likes_value"), sources.get("like_count"), dom_previews.get("like_count")),
         "collect_count": _field(note.get("collects_value"), sources.get("collect_count"), dom_previews.get("collect_count")),
         "comment_count": _field(note.get("comments_value"), sources.get("comment_count"), dom_previews.get("comment_count")),
-        "share_count": _field(note.get("shares_value"), sources.get("share_count"), dom_previews.get("share_count")),
         "tags": _field(note.get("hashtags") or [], sources.get("tags"), dom_previews.get("tags")),
     }
     return {

@@ -130,7 +130,7 @@ class Crawler:
                         prefer_incoming=True,
                         incoming_source="DETAIL_INITIAL_STATE",
                     )
-                note = await extract_note_dom(page, note_id, int(self.app_config.raw.get("collection", {}).get("collect_top_comments", 3)))
+                note = await extract_note_dom(page, note_id, 0)
                 note.update({k: card.get(k) for k in ("is_pinned",) if card.get(k) is not None})
                 note = merge_note_with_structured(note, self.structured_by_note.get(note_id))
                 dom_summary = await self._debug_dom_summary(page)
@@ -428,7 +428,6 @@ class Crawler:
         errors = 0
         completed = set(initial_completed or set())
         max_errors = int(self.app_config.raw.get("safety", {}).get("max_consecutive_errors", 3))
-        top_n = int(self.app_config.raw.get("collection", {}).get("collect_top_comments", 3))
         for index, card in enumerate(note_cards, start=1):
             note_id = card["note_id"]
             budget.check("collect_note", note_id)
@@ -486,7 +485,7 @@ class Crawler:
                         incoming_source="DETAIL_INITIAL_STATE",
                     )
                 pre_extract_capture = await capture_five_note_review_state(page, note_id) if review_dir else None
-                note = await extract_note_dom(page, note_id, top_n)
+                note = await extract_note_dom(page, note_id, 0)
                 if note.get("status") != "OK":
                     self.logger.info("NOTE non_ok note_id=%s status=%s reason=%s", note_id, note.get("status"), note.get("status_note"))
                 note.update({k: card.get(k) for k in ("is_pinned",) if card.get(k) is not None})
@@ -505,7 +504,7 @@ class Crawler:
                 checkpoint.completed_note_ids = sorted(completed)
                 checkpoint.save(self.app_config.base_dir / "data" / "checkpoints")
                 errors = 0
-                self.logger.info("NOTE attempt_result note_id=%s result=PARSED title=%s likes=%s exact=%s comments=%s top_level_comments=%s status=%s target_verified=true", note_id, note.get("title"), note.get("likes_value"), note.get("likes_is_exact"), note.get("comments_value"), len(note.get("top_comments", [])), note.get("status"))
+                self.logger.info("NOTE attempt_result note_id=%s result=PARSED title=%s likes=%s exact=%s comments=%s status=%s target_verified=true", note_id, note.get("title"), note.get("likes_value"), note.get("likes_is_exact"), note.get("comments_value"), note.get("status"))
                 if review_dir and pre_extract_capture:
                     post_extract_capture = await capture_five_note_review_state(page, note_id)
                     screenshot_tmp = review_dir / f".{note_id}_{uuid.uuid4().hex}.png"
@@ -852,7 +851,7 @@ class Crawler:
               const title = document.querySelector("#detail-title");
               const desc = document.querySelector("#detail-desc");
               const engage = document.querySelector(".engage-bar, [class*=engage], [class*=interaction], [class*=Interact]");
-              const metricSelectors = ".engage-bar .count, .engage-bar [class*=count], .engage-bar [class*=Count], .engage-bar [class*=like], .engage-bar [class*=Like], .engage-bar [class*=collect], .engage-bar [class*=Collect], .engage-bar [class*=comment], .engage-bar [class*=Comment], .engage-bar [class*=share], .engage-bar [class*=Share]";
+              const metricSelectors = ".engage-bar .count, .engage-bar [class*=count], .engage-bar [class*=Count], .engage-bar [class*=like], .engage-bar [class*=Like], .engage-bar [class*=collect], .engage-bar [class*=Collect], .engage-bar [class*=comment], .engage-bar [class*=Comment]";
               const tagSelectors = '#detail-desc a[href*="search"], #detail-desc a[href*="search_result"], a[href*="/search_result"], a[href*="/search"]';
               const noteRoots = Array.from(document.querySelectorAll('[class*="note-detail"], [class*="noteDetail"], [class*="NoteDetail"], [data-testid*="note-detail"], [role="dialog"]')).filter(visible);
               const exactLinks = noteId ? Array.from(document.querySelectorAll(`a[href*="${noteId}"]`)).filter(visible) : [];
@@ -873,8 +872,8 @@ class Crawler:
                     const hasStructuredDetail = Boolean(
                       value.desc || value.content || value.time || value.create_time || value.createTime ||
                       value.tagList || value.tags ||
-                      value.likedCount || value.liked_count || value.collectedCount || value.collected_count || value.commentCount || value.comment_count || value.shareCount || value.share_count ||
-                      interact.likedCount || interact.liked_count || interact.collectedCount || interact.collected_count || interact.commentCount || interact.comment_count || interact.shareCount || interact.share_count
+                      value.likedCount || value.liked_count || value.collectedCount || value.collected_count || value.commentCount || value.comment_count ||
+                      interact.likedCount || interact.liked_count || interact.collectedCount || interact.collected_count || interact.commentCount || interact.comment_count
                     );
                     if (hasStructuredDetail) return true;
                   }
@@ -968,7 +967,6 @@ class Crawler:
                       liked_count: firstScalar(["liked_count", "likedCount"], value) ?? firstScalar(["liked_count", "likedCount"], interact),
                       collected_count: firstScalar(["collected_count", "collectedCount"], value) ?? firstScalar(["collected_count", "collectedCount"], interact),
                       comment_count: firstScalar(["comment_count", "commentCount"], value) ?? firstScalar(["comment_count", "commentCount"], interact),
-                      share_count: firstScalar(["share_count", "shareCount"], value) ?? firstScalar(["share_count", "shareCount"], interact),
                       tags
                     };
                     return Object.fromEntries(Object.entries(out).filter(([, item]) => item !== undefined && item !== null && item !== "" && !(Array.isArray(item) && item.length === 0)));
@@ -1298,7 +1296,6 @@ NOTE_PUBLIC_RECORD_KEYS = {
     "liked_count",
     "collected_count",
     "comment_count",
-    "share_count",
     "tags",
     "_structured_source",
     "_field_sources",
@@ -1317,7 +1314,6 @@ NOTE_PUBLIC_BUSINESS_KEYS = {
     "liked_count",
     "collected_count",
     "comment_count",
-    "share_count",
     "tags",
 }
 
@@ -1329,7 +1325,6 @@ STRUCTURED_CANONICAL_FIELDS = {
     "like_count",
     "collect_count",
     "comment_count",
-    "share_count",
     "tags",
 }
 
@@ -1348,7 +1343,6 @@ STRUCTURED_FIELD_ALIASES = {
     "collected_count": "collect_count",
     "collect_count": "collect_count",
     "comment_count": "comment_count",
-    "share_count": "share_count",
     "tags": "tags",
 }
 
@@ -1653,7 +1647,6 @@ NOTE_PUBLIC_ALLOWLIST = {
     "liked_count",
     "collected_count",
     "comment_count",
-    "share_count",
 }
 
 PROFILE_PUBLIC_FIELD_ALIASES = {

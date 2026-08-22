@@ -27,7 +27,6 @@ COMPARE_FIELDS = [
     "like_count",
     "collect_count",
     "comment_count",
-    "share_count",
     "tags",
 ]
 
@@ -94,7 +93,6 @@ def normalized_extraction_from_note(note: dict[str, Any]) -> dict[str, dict[str,
         "like_count": _field(note.get("likes_value"), sources.get("like_count"), note.get("likes_raw")),
         "collect_count": _field(note.get("collects_value"), sources.get("collect_count"), note.get("collects_raw")),
         "comment_count": _field(note.get("comments_value"), sources.get("comment_count"), note.get("comments_raw"), comment_evidence),
-        "share_count": _field(note.get("shares_value"), sources.get("share_count"), note.get("shares_raw")),
         "tags": _field(note.get("hashtags") or [], sources.get("tags")),
     }
 
@@ -142,7 +140,6 @@ def build_actual_payload(note_id: str, detail_ready: bool, fields: dict[str, dic
             "like_raw": fields["like_count"].get("raw_display"),
             "collect_raw": fields["collect_count"].get("raw_display"),
             "comment_raw": fields["comment_count"].get("raw_display"),
-            "share_raw": fields["share_count"].get("raw_display"),
         },
     }
 
@@ -272,7 +269,7 @@ async def _extract_one_golden_note(crawler: Crawler, browser: BrowserSession, pa
             prefer_incoming=True,
             incoming_source="DETAIL_INITIAL_STATE",
         )
-    note = await extract_note_dom(page, note_id, int(crawler.app_config.raw.get("collection", {}).get("collect_top_comments", 3)))
+    note = await extract_note_dom(page, note_id, 0)
     note.update({k: card.get(k) for k in ("is_pinned",) if card.get(k) is not None})
     note = merge_note_with_structured(note, crawler.structured_by_note.get(note_id))
     fields = normalized_extraction_from_note(note)
@@ -442,7 +439,6 @@ async def capture_detail_review_state(page: Any, note_id: str) -> dict[str, Any]
               ...metric([".engage-bar .chat-wrapper", ".engage-bar [class*=chat-wrapper]", ".engage-bar [class*=comment-wrapper]", ".engage-bar [class*=Chat]", ".engage-bar [class*=Comment]"]),
               zero_comment_evidence: zeroCommentEvidence()
             },
-            share_count: metric([".engage-bar .share-wrapper", ".engage-bar [class*=share-wrapper]", ".engage-bar [class*=shareWrapper]", ".engage-bar [class*=Share]"]),
             tags: {selectors_checked: ['#detail-desc a[href*="search"]', '#detail-desc a[href*="search_result"]', 'a[href*="/search_result"]', 'a[href*="/search"]'], matched_count: root ? root.querySelectorAll('#detail-desc a[href*="search"], #detail-desc a[href*="search_result"], a[href*="/search_result"], a[href*="/search"]').length : 0, text: root ? Array.from(root.querySelectorAll('#detail-desc a[href*="search"], #detail-desc a[href*="search_result"], a[href*="/search_result"], a[href*="/search"]')).map((el) => clean(el)).filter(Boolean).join("\\n") : ""}
           };
           return {

@@ -1,6 +1,7 @@
 {
   "note_id": "6a7b27e9000000003400c518",
   "detail_ready": true,
+  "status": "OK",
   "fields": {
     "title": {
       "value": "不来姨妈！别总怀疑得了多囊",
@@ -16,27 +17,25 @@
     },
     "publish_time": {
       "value": "08-11",
-      "source": "DOM_EXACT",
-      "raw_display": "08-11"
+      "source": "DOM_EXACT"
     },
     "like_count": {
       "value": 5,
       "source": "DOM_EXACT",
-      "raw_display": "5"
+      "raw": "5",
+      "exact": true
     },
     "collect_count": {
       "value": 1,
       "source": "DOM_EXACT",
-      "raw_display": "1"
+      "raw": "1",
+      "exact": true
     },
     "comment_count": {
       "value": 0,
       "source": "DOM_EXACT",
-      "raw_display": "0",
-      "zero_comment_evidence": true,
-      "zero_comment_evidence_text": "这是一片荒地点击评论",
-      "comment_area_found": true,
-      "comment_area_selector": "div.comments-el"
+      "raw": "0",
+      "exact": true
     },
     "tags": {
       "value": [
@@ -47,9 +46,8 @@
       "source": "DOM_EXACT"
     }
   },
-  "raw_display": {
-    "like_raw": "5",
-    "collect_raw": "1",
-    "comment_raw": "0"
+  "quality": {
+    "passed": true,
+    "issues": []
   }
 }

@@ -18,11 +18,8 @@ PROFILE_HEADERS = ["字段", "当前值", "原始显示", "是否精确", "采�
 NOTE_HEADERS = [
     "序号", "note_id", "笔记URL", "是否置顶", "标题", "帖子类型", "发布时间", "最后更新时间",
     "点赞数", "点赞原始显示", "点赞是否精确", "收藏数", "收藏原始显示", "收藏是否精确",
-    "评论数", "评论原始显示", "评论是否精确", "分享数", "分享原始显示", "分享是否精确",
+    "评论数", "评论原始显示", "评论是否精确",
     "正文", "标签",
-    "评论1_作者", "评论1_正文", "评论1_点赞数", "评论1_是否作者", "评论1_是否置顶", "评论1_采集时间",
-    "评论2_作者", "评论2_正文", "评论2_点赞数", "评论2_是否作者", "评论2_是否置顶", "评论2_采集时间",
-    "评论3_作者", "评论3_正文", "评论3_点赞数", "评论3_是否作者", "评论3_是否置顶", "评论3_采集时间",
     "笔记采集时间", "采集状态", "备注",
 ]
 
@@ -80,20 +77,6 @@ def _write_profile_sheet(ws: Any, profile: Any) -> None:
 def _write_notes_sheet(ws: Any, db: Database, creator_id: str) -> None:
     ws.append(NOTE_HEADERS)
     for index, note in enumerate(db.current_notes(creator_id), start=1):
-        comments = db.comments_for_note(note["note_id"])
-        flattened_comments = []
-        for rank in range(1, 4):
-            comment = comments[rank - 1] if len(comments) >= rank else None
-            flattened_comments.extend(
-                [
-                    comment["author_name"] if comment else None,
-                    comment["body"] if comment else None,
-                    comment["likes_value"] if comment else None,
-                    _bool_text(comment["is_creator"]) if comment else None,
-                    _bool_text(comment["is_pinned"]) if comment else None,
-                    comment["captured_at"] if comment else None,
-                ]
-            )
         ws.append(
             [
                 index,
@@ -113,12 +96,8 @@ def _write_notes_sheet(ws: Any, db: Database, creator_id: str) -> None:
                 note["comments_value"],
                 note["comments_raw"],
                 _bool_text(note["comments_is_exact"]),
-                note["shares_value"],
-                note["shares_raw"],
-                _bool_text(note["shares_is_exact"]),
                 note["body"],
                 _json_text(note["hashtags"]),
-                *flattened_comments,
                 note["metrics_captured_at"],
                 note["status"],
                 note["status_note"],
@@ -189,4 +168,3 @@ def _bool_text(value: Any) -> str | None:
     if isinstance(value, str):
         return value
     return "是" if bool(value) else "否"
-

@@ -1,14 +1,14 @@
 {
-  "note_id": "6a7b27e9000000003400c518",
+  "note_id": "697d9a77000000000e00f1fd",
   "pre_extract_dom_summary": {
-    "note_id": "6a7b27e9000000003400c518",
+    "note_id": "697d9a77000000000e00f1fd",
     "detail_root": {
       "root_found": true,
       "root_reason": "DETAIL_EVIDENCE_ROOT",
       "detail_selector": "[class*=\"note-detail\"], [class*=\"noteDetail\"], [class*=\"NoteDetail\"], [data-testid*=\"note-detail\"], [role=\"dialog\"]",
       "evidence_selector": "#detail-title, #detail-desc, .engage-bar, [class*=engage], [class*=interaction], [class*=Interact]",
       "detail_root_count": 3,
-      "evidence_count": 9
+      "evidence_count": 24
     },
     "fields": {
       "title": {
@@ -19,7 +19,7 @@
           "[data-testid*=title]"
         ],
         "matched_count": 1,
-        "text": "不来姨妈！别总怀疑得了多囊"
+        "text": "如果我光头你还会爱我吗？"
       },
       "body": {
         "selectors_checked": [
@@ -30,21 +30,14 @@
           "[data-testid*=content]"
         ],
         "matched_count": 1,
-        "text": "#愿世界没有痛经 #内分泌平衡 #多囊"
-      },
-      "note_type": {
-        "selectors_checked": [
-          "detail root text/meta"
-        ],
-        "matched_count": 1,
-        "text": "请刷新试试\n辣香郭\n关注\n不来姨妈！别总怀疑得了多囊\n#愿世界没有痛经 #内分泌平衡 #多囊\n猜你想搜\n多囊有什么危害\n08-11 广东\n\n这是一片荒地点击评论\n\n说点什么...\n5\n1\n评论\n发送\n取消"
+        "text": "#白天鹅生发仪#生发养发#养发#剃光头养发"
       },
       "publish_time": {
         "selectors_checked": [
           "detail root text"
         ],
         "matched_count": 1,
-        "text": "请刷新试试\n辣香郭\n关注\n不来姨妈！别总怀疑得了多囊\n#愿世界没有痛经 #内分泌平衡 #多囊\n猜你想搜\n多囊有什么危害\n08-11 广东\n\n这是一片荒地点击评论\n\n说点什么...\n5\n1\n评论\n发送\n取消"
+        "text": "辣香郭\n关注\n如果我光头你还会爱我吗？\n#白天鹅生发仪#生发养发#养发#剃光头养发\n猜你想搜\n剪头发剃光头\n01-31\n共 17 条评论\nlind\n我也是天生发量少，我妈妈就少，这导致我整个学生时期自卑到现在\n02-03上海\n1\n2\n辣香郭\n作者\n我也是从奶奶开始就少，到现在就更少了\n02-03广东\n赞\n回复\n展开 1 条回复\n果蔬\n好久不见头发长那么好了，替你高兴丫头\n03-11广东\n赞\n1\n辣香郭\n作者\n谢谢宝，没想到这么久还有宝宝关注我\n03-11广东\n赞\n回复\n和大将\n生发仪戴多久有用，我也看的这款\n02-02江西\n1\n1\n辣香郭\n作者\n用了半年\n02-03广东\n赞\n回复\nlilies\n我也想剃光头了，走哪掉哪，家里到处都是头发\n02-02广东\n1\n1\n辣香郭\n作者\n别说了，我之前也一样\n02-03广东\n赞\n回复\n相识九月\n我头发也是太少了，尤其是头顶\n02-02江西\n1\n1\n辣香郭\n作者\n我也是发缝上面\n02-03广东\n赞\n回复\n确定是首席\n剃光头不能养发，要不就没有男人中年地中海的无奈了，别轻信谣言\n02-06河北\n赞\n回复\n▶|II|II||III|II 14＂\n我天天研"
       },
       "like_count": {
         "selectors_checked": [
@@ -54,7 +47,7 @@
           ".engage-bar [class*=Like]"
         ],
         "matched_count": 1,
-        "text": "5"
+        "text": "58"
       },
       "collect_count": {
         "selectors_checked": [
@@ -64,7 +57,7 @@
           ".engage-bar [class*=Collect]"
         ],
         "matched_count": 1,
-        "text": "1"
+        "text": "8"
       },
       "comment_count": {
         "selectors_checked": [
@@ -75,7 +68,7 @@
           ".engage-bar [class*=Comment]"
         ],
         "matched_count": 1,
-        "text": "评论",
+        "text": "17",
         "zero_comment_evidence": {
           "comment_area_found": true,
           "comment_area_selector": "div.comments-el",
@@ -147,8 +140,8 @@
             "[data-testid*=empty]",
             "[data-testid*=placeholder]"
           ],
-          "matched_count": 1,
-          "text": "这是一片荒地点击评论"
+          "matched_count": 0,
+          "text": ""
         }
       },
       "tags": {
@@ -158,20 +151,20 @@
           "a[href*=\"/search_result\"]",
           "a[href*=\"/search\"]"
         ],
-        "matched_count": 3,
-        "text": "#愿世界没有痛经\n#内分泌平衡\n#多囊"
+        "matched_count": 4,
+        "text": "#白天鹅生发仪\n#生发养发\n#养发\n#剃光头养发"
       }
     }
   },
   "post_extract_dom_summary": {
-    "note_id": "6a7b27e9000000003400c518",
+    "note_id": "697d9a77000000000e00f1fd",
     "detail_root": {
       "root_found": true,
       "root_reason": "DETAIL_EVIDENCE_ROOT",
       "detail_selector": "[class*=\"note-detail\"], [class*=\"noteDetail\"], [class*=\"NoteDetail\"], [data-testid*=\"note-detail\"], [role=\"dialog\"]",
       "evidence_selector": "#detail-title, #detail-desc, .engage-bar, [class*=engage], [class*=interaction], [class*=Interact]",
       "detail_root_count": 3,
-      "evidence_count": 9
+      "evidence_count": 24
     },
     "fields": {
       "title": {
@@ -182,7 +175,7 @@
           "[data-testid*=title]"
         ],
         "matched_count": 1,
-        "text": "不来姨妈！别总怀疑得了多囊"
+        "text": "如果我光头你还会爱我吗？"
       },
       "body": {
         "selectors_checked": [
@@ -193,21 +186,14 @@
           "[data-testid*=content]"
         ],
         "matched_count": 1,
-        "text": "#愿世界没有痛经 #内分泌平衡 #多囊"
-      },
-      "note_type": {
-        "selectors_checked": [
-          "detail root text/meta"
-        ],
-        "matched_count": 1,
-        "text": "请刷新试试\n辣香郭\n关注\n不来姨妈！别总怀疑得了多囊\n#愿世界没有痛经 #内分泌平衡 #多囊\n猜你想搜\n多囊有什么危害\n08-11 广东\n\n这是一片荒地点击评论\n\n说点什么...\n5\n1\n评论\n发送\n取消"
+        "text": "#白天鹅生发仪#生发养发#养发#剃光头养发"
       },
       "publish_time": {
         "selectors_checked": [
           "detail root text"
         ],
         "matched_count": 1,
-        "text": "请刷新试试\n辣香郭\n关注\n不来姨妈！别总怀疑得了多囊\n#愿世界没有痛经 #内分泌平衡 #多囊\n猜你想搜\n多囊有什么危害\n08-11 广东\n\n这是一片荒地点击评论\n\n说点什么...\n5\n1\n评论\n发送\n取消"
+        "text": "请刷新试试\n辣香郭\n关注\n如果我光头你还会爱我吗？\n#白天鹅生发仪#生发养发#养发#剃光头养发\n猜你想搜\n剪头发剃光头\n01-31\n共 17 条评论\nlind\n我也是天生发量少，我妈妈就少，这导致我整个学生时期自卑到现在\n02-03上海\n1\n2\n辣香郭\n作者\n我也是从奶奶开始就少，到现在就更少了\n02-03广东\n赞\n回复\n展开 1 条回复\n果蔬\n好久不见头发长那么好了，替你高兴丫头\n03-11广东\n赞\n1\n辣香郭\n作者\n谢谢宝，没想到这么久还有宝宝关注我\n03-11广东\n赞\n回复\n和大将\n生发仪戴多久有用，我也看的这款\n02-02江西\n1\n1\n辣香郭\n作者\n用了半年\n02-03广东\n赞\n回复\nlilies\n我也想剃光头了，走哪掉哪，家里到处都是头发\n02-02广东\n1\n1\n辣香郭\n作者\n别说了，我之前也一样\n02-03广东\n赞\n回复\n相识九月\n我头发也是太少了，尤其是头顶\n02-02江西\n1\n1\n辣香郭\n作者\n我也是发缝上面\n02-03广东\n赞\n回复\n确定是首席\n剃光头不能养发，要不就没有男人中年地中海的无奈了，别轻信谣言\n02-06河北\n赞\n回复\n▶|II|II||III|II 14"
       },
       "like_count": {
         "selectors_checked": [
@@ -217,7 +203,7 @@
           ".engage-bar [class*=Like]"
         ],
         "matched_count": 1,
-        "text": "5"
+        "text": "58"
       },
       "collect_count": {
         "selectors_checked": [
@@ -227,7 +213,7 @@
           ".engage-bar [class*=Collect]"
         ],
         "matched_count": 1,
-        "text": "1"
+        "text": "8"
       },
       "comment_count": {
         "selectors_checked": [
@@ -238,7 +224,7 @@
           ".engage-bar [class*=Comment]"
         ],
         "matched_count": 1,
-        "text": "评论",
+        "text": "17",
         "zero_comment_evidence": {
           "comment_area_found": true,
           "comment_area_selector": "div.comments-el",
@@ -310,8 +296,8 @@
             "[data-testid*=empty]",
             "[data-testid*=placeholder]"
           ],
-          "matched_count": 1,
-          "text": "这是一片荒地点击评论"
+          "matched_count": 0,
+          "text": ""
         }
       },
       "tags": {
@@ -321,10 +307,10 @@
           "a[href*=\"/search_result\"]",
           "a[href*=\"/search\"]"
         ],
-        "matched_count": 3,
-        "text": "#愿世界没有痛经\n#内分泌平衡\n#多囊"
+        "matched_count": 4,
+        "text": "#白天鹅生发仪\n#生发养发\n#养发\n#剃光头养发"
       }
     }
   },
-  "pre_post_consistent": true
+  "pre_post_consistent": false
 }

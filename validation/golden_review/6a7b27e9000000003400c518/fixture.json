@@ -33,10 +33,6 @@
       "assert": "exact",
       "value": 0
     },
-    "share_count": {
-      "assert": "skip",
-      "reason": "not_visible_in_manual_reference"
-    },
     "tags": {
       "assert": "exact",
       "value": [

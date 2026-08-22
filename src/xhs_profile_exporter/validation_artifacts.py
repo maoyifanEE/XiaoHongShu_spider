@@ -14,7 +14,6 @@ VALIDATION_FIELDS = [
     "like_count",
     "collect_count",
     "comment_count",
-    "share_count",
     "tags",
 ]
 
@@ -40,7 +39,6 @@ CSV_HEADERS = [
     "like_count",
     "collect_count",
     "comment_count",
-    "share_count",
     "tags",
     "detail_ready",
     "exportable",
@@ -97,7 +95,6 @@ def build_validation_note(note_id: str, note: dict[str, Any], *, detail_ready: b
         "like_count": note.get("likes_value"),
         "collect_count": note.get("collects_value"),
         "comment_count": note.get("comments_value"),
-        "share_count": note.get("shares_value"),
         "tags": note.get("hashtags") or [],
         "detail_ready": bool(detail_ready),
         "exportable": bool(exportable),
@@ -115,7 +112,6 @@ def build_detail_not_ready_validation_note(note_id: str) -> dict[str, Any]:
         "like_count": None,
         "collect_count": None,
         "comment_count": None,
-        "share_count": None,
         "tags": [],
         "detail_ready": False,
         "exportable": False,
@@ -142,7 +138,7 @@ def _csv_row(note: dict[str, Any]) -> dict[str, Any]:
     sources = note.get("field_sources") or {}
     metric_sources = {
         field: sources.get(field) or "MISSING"
-        for field in ["like_count", "collect_count", "comment_count", "share_count"]
+        for field in ["like_count", "collect_count", "comment_count"]
     }
     return {
         "note_id": note.get("note_id"),
@@ -152,7 +148,6 @@ def _csv_row(note: dict[str, Any]) -> dict[str, Any]:
         "like_count": note.get("like_count"),
         "collect_count": note.get("collect_count"),
         "comment_count": note.get("comment_count"),
-        "share_count": note.get("share_count"),
         "tags": " ".join(str(tag) for tag in (note.get("tags") or []) if tag),
         "detail_ready": bool(note.get("detail_ready")),
         "exportable": bool(note.get("exportable")),

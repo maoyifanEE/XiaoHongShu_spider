@@ -1,6 +1,7 @@
 {
   "note_id": "69de332f000000002301ea70",
   "detail_ready": true,
+  "status": "OK",
   "fields": {
     "title": {
       "value": "📝记录人生第四次 小晕小倒",
@@ -16,23 +17,25 @@
     },
     "publish_time": {
       "value": "04-14",
-      "source": "DOM_EXACT",
-      "raw_display": "04-14"
+      "source": "DOM_EXACT"
     },
     "like_count": {
       "value": 32,
       "source": "DOM_EXACT",
-      "raw_display": "32"
+      "raw": "32",
+      "exact": true
     },
     "collect_count": {
       "value": 5,
       "source": "DOM_EXACT",
-      "raw_display": "5"
+      "raw": "5",
+      "exact": true
     },
     "comment_count": {
       "value": 3,
       "source": "DOM_EXACT",
-      "raw_display": "3"
+      "raw": "3",
+      "exact": true
     },
     "tags": {
       "value": [
@@ -43,9 +46,8 @@
       "source": "DOM_EXACT"
     }
   },
-  "raw_display": {
-    "like_raw": "32",
-    "collect_raw": "5",
-    "comment_raw": "3"
+  "quality": {
+    "passed": true,
+    "issues": []
   }
 }

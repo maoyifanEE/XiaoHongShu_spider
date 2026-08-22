@@ -127,7 +127,7 @@ async def discover_note_cards(page: Any) -> list[dict[str, Any]]:
     return results
 
 
-async def extract_note_dom(page: Any, note_id: str, top_n: int = 3) -> dict[str, Any]:
+async def extract_note_dom(page: Any, note_id: str, top_n: int = 0) -> dict[str, Any]:
     data = await page.evaluate(
         """
         (noteId) => {
@@ -203,22 +203,11 @@ async def extract_note_dom(page: Any, note_id: str, top_n: int = 3) -> dict[str,
           const domMetrics = {
             likes: metricText([".engage-bar .like-wrapper", ".engage-bar [class*=like-wrapper]", ".engage-bar [class*=likeWrapper]", ".engage-bar [class*=Like]"]),
             collects: metricText([".engage-bar .collect-wrapper", ".engage-bar [class*=collect-wrapper]", ".engage-bar [class*=collectWrapper]", ".engage-bar [class*=Collect]"]),
-            comments: metricText([".engage-bar .chat-wrapper", ".engage-bar [class*=chat-wrapper]", ".engage-bar [class*=comment-wrapper]", ".engage-bar [class*=Chat]", ".engage-bar [class*=Comment]"]),
-            shares: metricText([".engage-bar .share-wrapper", ".engage-bar [class*=share-wrapper]", ".engage-bar [class*=shareWrapper]", ".engage-bar [class*=Share]"])
+            comments: metricText([".engage-bar .chat-wrapper", ".engage-bar [class*=chat-wrapper]", ".engage-bar [class*=comment-wrapper]", ".engage-bar [class*=Chat]", ".engage-bar [class*=Comment]"])
           };
           const tagNames = Array.from(root.querySelectorAll('#detail-desc a[href*="search"], #detail-desc a[href*="search_result"], a[href*="/search_result"], a[href*="/search"]'))
             .map((el) => clean(el).replace(/^#/, ""))
             .filter(Boolean);
-          const commentEls = Array.from(root.querySelectorAll('[class*=comment-item], [class*=commentItem], [data-testid*=comment]')).slice(0, 20);
-          const comments = commentEls.map((el) => {
-             const childComment = el.parentElement && el.parentElement.closest('[class*=comment-item], [class*=commentItem], [data-testid*=comment]') !== el;
-             return {
-               text: el.innerText || "",
-               id: el.getAttribute("data-id") || el.id || null,
-               classes: el.className || "",
-               nested: Boolean(childComment),
-             };
-          });
           const zeroCommentWords = ["这是一片荒地", "暂无评论", "还没有评论"];
           const commentArea = findCommentAreaRoot();
           const zeroCommentSelectors = '[class*=empty], [class*=Empty], [class*=placeholder], [class*=Placeholder], [data-testid*=empty], [data-testid*=placeholder]';
@@ -241,7 +230,6 @@ async def extract_note_dom(page: Any, note_id: str, top_n: int = 3) -> dict[str,
             commentAreaSelector: describeSelector(commentArea.el),
             tagNames,
             meta,
-            comments,
             url: location.href
           };
         }
@@ -258,7 +246,6 @@ async def extract_note_dom(page: Any, note_id: str, top_n: int = 3) -> dict[str,
     publish_raw = _extract_publish_time(text)
     publish_time, publish_time_raw = normalize_relative_time(publish_raw)
     metrics = _extract_note_metrics(data.get("domMetrics") or {}, bool(data.get("commentZeroEvidence")))
-    comments = _extract_comments(data.get("comments") or [], top_n)
     return {
         "note_id": note_id,
         "canonical_url": canonical_note_url(note_id),
@@ -273,7 +260,7 @@ async def extract_note_dom(page: Any, note_id: str, top_n: int = 3) -> dict[str,
         "updated_time_raw": None,
         "status": unavailable_status[0] if unavailable_status else ("OK" if body or title else "PARSE_PARTIAL"),
         "status_note": unavailable_status[1] if unavailable_status else (None if body or title else "DOM 未提取到标题或正文"),
-        "top_comments": comments,
+        "top_comments": [],
         "raw_json": {
             "meta": data.get("meta"),
             "url": sanitize_url(data.get("url")),
@@ -297,7 +284,6 @@ async def extract_note_dom(page: Any, note_id: str, top_n: int = 3) -> dict[str,
                 "like_count": metrics.get("likes_value"),
                 "collect_count": metrics.get("collects_value"),
                 "comment_count": metrics.get("comments_value"),
-                "share_count": metrics.get("shares_value"),
                 "tags": hashtags,
             },
             "DOM_EXACT",
@@ -331,7 +317,6 @@ def merge_note_with_structured(note: dict[str, Any], structured: dict[str, Any] 
             ("liked_count", "likes"),
             ("collected_count", "collects"),
             ("comment_count", "comments"),
-            ("share_count", "shares"),
         ]:
             if item.get(key) is None:
                 continue
@@ -425,7 +410,6 @@ def normalize_public_note_record(value: dict[str, Any], note_id: str) -> dict[st
         "liked_count": ["liked_count", "likedCount"],
         "collected_count": ["collected_count", "collectedCount"],
         "comment_count": ["comment_count", "commentCount"],
-        "share_count": ["share_count", "shareCount"],
     }.items():
         for alias in aliases:
             if alias in value and not isinstance(value.get(alias), (dict, list)):
@@ -465,7 +449,7 @@ def merge_tags(*tag_groups: Any) -> list[str]:
 
 def _extract_note_metrics(dom_metrics: dict[str, Any], comment_zero_evidence: bool = False) -> dict[str, Any]:
     result: dict[str, Any] = {}
-    for key in ["likes", "collects", "comments", "shares"]:
+    for key in ["likes", "collects", "comments"]:
         raw = dom_metrics.get(key)
         value, raw_display, exact = parse_count(raw)
         if key == "comments" and value is None and comment_zero_evidence:
@@ -486,60 +470,6 @@ def _detect_unavailable_status(text: str) -> tuple[str, str] | None:
     if "已被删除" in text:
         return "NO_LONGER_PUBLIC", "页面明确显示内容已被删除"
     return None
-
-
-def _extract_metric_around_label(text: str, label: str) -> str | None:
-    patterns = [
-        rf"{label}\s*([0-9]+(?:\.[0-9]+)?\s*(?:万|千|w|W|k|K)?)",
-        rf"([0-9]+(?:\.[0-9]+)?\s*(?:万|千|w|W|k|K)?)\s*{label}",
-    ]
-    for pattern in patterns:
-        match = re.search(pattern, text)
-        if match:
-            return match.group(1).replace(" ", "")
-    return None
-
-
-def _extract_comments(items: list[dict[str, Any]], top_n: int) -> list[dict[str, Any]]:
-    comments = []
-    seen = set()
-    for item in items:
-        if item.get("nested"):
-            continue
-        text = _clean_multiline(item.get("text") or "")
-        if not text or text in seen:
-            continue
-        if any(word in text for word in ["全部评论", "暂无评论"]):
-            continue
-        seen.add(text)
-        lines = [line for line in text.splitlines() if line.strip()]
-        author = lines[0] if lines else None
-        body_lines = [
-            line
-            for line in lines[1:]
-            if line not in {"回复", "点赞", "展开回复"} and not line.startswith("展开") and not line.endswith("回复")
-        ]
-        body = "\n".join(body_lines) if body_lines else (lines[1] if len(lines) > 1 else text)
-        like_raw = _extract_metric_around_label(text, "赞")
-        value, raw, exact = parse_count(like_raw)
-        comments.append(
-            {
-                "rank": len(comments) + 1,
-                "comment_id": item.get("id"),
-                "author_name": author,
-                "body": body,
-                "likes_value": value,
-                "likes_raw": raw,
-                "likes_is_exact": exact,
-                "is_creator": "作者" in text,
-                "is_pinned": "置顶" in text,
-                "sorting_mode": "default_ui_order",
-                "source": "dom",
-            }
-        )
-        if len(comments) >= top_n:
-            break
-    return comments
 
 
 def _empty_note(note_id: str, status: str, status_note: str, raw: dict[str, Any] | None = None) -> dict[str, Any]:
@@ -570,9 +500,6 @@ def _empty_note(note_id: str, status: str, status_note: str, raw: dict[str, Any]
         "comments_value": None,
         "comments_raw": None,
         "comments_is_exact": None,
-        "shares_value": None,
-        "shares_raw": None,
-        "shares_is_exact": None,
     }
 
 
@@ -581,7 +508,6 @@ def _metric_field_name(metric_prefix: str) -> str:
         "likes": "like_count",
         "collects": "collect_count",
         "comments": "comment_count",
-        "shares": "share_count",
     }[metric_prefix]
 
 
@@ -605,7 +531,6 @@ NOTE_COMPLETENESS_FIELDS = [
     "like_count",
     "collect_count",
     "comment_count",
-    "share_count",
     "tags",
 ]
 
@@ -619,7 +544,6 @@ def note_completeness_values(note: dict[str, Any]) -> dict[str, Any]:
         "like_count": note.get("likes_value"),
         "collect_count": note.get("collects_value"),
         "comment_count": note.get("comments_value"),
-        "share_count": note.get("shares_value"),
         "tags": note.get("hashtags"),
     }
 

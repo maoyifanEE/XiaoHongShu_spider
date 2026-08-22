@@ -151,16 +151,6 @@
           "text": ""
         }
       },
-      "share_count": {
-        "selectors_checked": [
-          ".engage-bar .share-wrapper",
-          ".engage-bar [class*=share-wrapper]",
-          ".engage-bar [class*=shareWrapper]",
-          ".engage-bar [class*=Share]"
-        ],
-        "matched_count": 1,
-        "text": ""
-      },
       "tags": {
         "selectors_checked": [
           "#detail-desc a[href*=\"search\"]",
@@ -323,16 +313,6 @@
           "matched_count": 0,
           "text": ""
         }
-      },
-      "share_count": {
-        "selectors_checked": [
-          ".engage-bar .share-wrapper",
-          ".engage-bar [class*=share-wrapper]",
-          ".engage-bar [class*=shareWrapper]",
-          ".engage-bar [class*=Share]"
-        ],
-        "matched_count": 1,
-        "text": ""
       },
       "tags": {
         "selectors_checked": [

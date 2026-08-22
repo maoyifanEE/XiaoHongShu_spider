@@ -51,7 +51,7 @@ def test_live_golden_validation(monkeypatch):
     assert result["passed"] is True
     assert len(result["notes"]) == 3
     assert result["diffs"] == []
-    assert result["stats"] == {"asserted_fields": 24, "passed_fields": 24, "failed_fields": 0, "skipped_fields": 3}
+    assert result["stats"] == {"asserted_fields": 24, "passed_fields": 24, "failed_fields": 0, "skipped_fields": 0}
 
 
 def test_golden_exact_assertion():
@@ -67,8 +67,8 @@ def test_golden_exact_assertion():
 def test_golden_missing_assertion():
     result = compare_golden_expected(
         "note",
-        _expected_with("share_count", {"assert": "missing"}),
-        _actual_with("share_count", None, "MISSING"),
+        _expected_with("comment_count", {"assert": "missing"}),
+        _actual_with("comment_count", None, "MISSING"),
     )
     assert result["passed"] is True
     assert result["stats"]["passed_fields"] == 1
@@ -89,15 +89,17 @@ def test_golden_skip_assertion():
 
 def test_unknown_null_not_used_as_skip():
     fixture = {"note_id": "note", "expected": {field: {"assert": "skip", "reason": "x"} for field in COMPARE_FIELDS}}
-    fixture["expected"]["share_count"] = None
+    fixture["expected"]["comment_count"] = None
     with pytest.raises(ValueError, match="assertion semantics"):
         validate_golden_fixture(fixture)
 
 
 def test_body_is_a_golden_field():
     assert "body" in COMPARE_FIELDS
+    assert "share_count" not in COMPARE_FIELDS
     for fixture in load_golden_fixtures(FIXTURE_DIR):
         assert "body" in fixture["expected"]
+        assert "share_count" not in fixture["expected"]
 
 
 def test_first_golden_note_body_is_exact():

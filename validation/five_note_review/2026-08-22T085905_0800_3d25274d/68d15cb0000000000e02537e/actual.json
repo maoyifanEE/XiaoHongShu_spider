@@ -1,0 +1,57 @@
+{
+  "note_id": "68d15cb0000000000e02537e",
+  "detail_ready": true,
+  "status": "OK",
+  "fields": {
+    "title": {
+      "value": "00后三甲护士裸辞了！！",
+      "source": "DOM_EXACT"
+    },
+    "body": {
+      "value": "#我是奇思妙想的小羊 我真的在毕业当年，就离开临床了，重启了人生...给自己一年时间#小红书夜人节 #辞职 #重启人生 #护士 #裸辞 #应届生",
+      "source": "DOM_EXACT"
+    },
+    "note_type": {
+      "value": "视频",
+      "source": "DOM_EXACT"
+    },
+    "publish_time": {
+      "value": "2025-09-22",
+      "source": "DOM_EXACT"
+    },
+    "like_count": {
+      "value": 303,
+      "source": "DOM_EXACT",
+      "raw": "303",
+      "exact": true
+    },
+    "collect_count": {
+      "value": 18,
+      "source": "DOM_EXACT",
+      "raw": "18",
+      "exact": true
+    },
+    "comment_count": {
+      "value": 29,
+      "source": "DOM_EXACT",
+      "raw": "29",
+      "exact": true
+    },
+    "tags": {
+      "value": [
+        "小红书夜人节",
+        "应届生",
+        "我是奇思妙想的小羊",
+        "护士",
+        "裸辞",
+        "辞职",
+        "重启人生"
+      ],
+      "source": "DOM_EXACT"
+    }
+  },
+  "quality": {
+    "passed": true,
+    "issues": []
+  }
+}

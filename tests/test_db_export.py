@@ -3,7 +3,7 @@ from pathlib import Path
 from openpyxl import load_workbook
 
 from xhs_profile_exporter.db import Database
-from xhs_profile_exporter.exporter import export_excel
+from xhs_profile_exporter.exporter import NOTE_HEADERS, export_excel
 from xhs_profile_exporter.qa import run_offline_qa
 
 
@@ -48,9 +48,6 @@ def test_db_qa_and_export(tmp_path: Path):
             "comments_value": 1,
             "comments_raw": "1",
             "comments_is_exact": True,
-            "shares_value": None,
-            "shares_raw": None,
-            "shares_is_exact": None,
             "top_comments": [{"rank": 1, "author_name": "A", "body": "评论", "source": "test"}],
             "status": "OK",
             "source": "test",
@@ -58,10 +55,21 @@ def test_db_qa_and_export(tmp_path: Path):
     )
     report = run_offline_qa(db, creator_id, DummyLogger())
     assert report["passed"] is True
+    assert "shares" not in report["metrics"]
+    assert "comments" not in report
+    assert db.conn.execute("SELECT COUNT(*) FROM top_comments").fetchone()[0] == 0
+    current = db.current_notes(creator_id)[0]
+    assert "shares_value" not in current.keys()
     path = export_excel(db, tmp_path, creator_id, "测试博主", DummyLogger())
     wb = load_workbook(path)
     assert "博主主页" in wb.sheetnames
     assert "公开笔记" in wb.sheetnames
     assert wb["公开笔记"].max_row == 2
+    headers = [cell.value for cell in wb["公开笔记"][1]]
+    assert headers == NOTE_HEADERS
+    assert "分享数" not in headers
+    assert "分享原始显示" not in headers
+    assert "分享是否精确" not in headers
+    assert not any(str(header).startswith(("评论1_", "评论2_", "评论3_")) for header in headers)
+    assert {"评论数", "评论原始显示", "评论是否精确"}.issubset(set(headers))
     db.close()
-
